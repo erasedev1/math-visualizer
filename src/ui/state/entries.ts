@@ -1,10 +1,12 @@
+import { formatSliderValue, type SliderConfig } from '@/core/workspace/slider';
+
 /**
- * Workspace entries for milestone 1.
+ * Workspace entries.
  *
- * Entries are plain, serialisable data: the graph is derived from them, never
- * the other way round. When the reactive dependency graph and the
- * command/undo system arrive, this becomes the payload they operate on rather
- * than something to rewrite.
+ * Entries are plain, serialisable data: the graph and every computed value are
+ * derived from them, never the other way round. The source text is the single
+ * source of truth, so a slider writes its number back into the expression
+ * rather than holding a value beside it.
  */
 
 export interface ExpressionEntry {
@@ -14,6 +16,8 @@ export interface ExpressionEntry {
   readonly colorIndex: number;
   readonly lineWidth: number;
   readonly visible: boolean;
+  /** Slider settings, once the user has adjusted them. */
+  readonly slider: SliderConfig | null;
 }
 
 export const DEFAULT_LINE_WIDTH = 2;
@@ -30,6 +34,7 @@ export function createEntry(source = '', colorIndex = 0): ExpressionEntry {
     colorIndex,
     lineWidth: DEFAULT_LINE_WIDTH,
     visible: true,
+    slider: null,
   };
 }
 
@@ -65,4 +70,12 @@ export function removeEntry(
   id: string,
 ): ExpressionEntry[] {
   return entries.filter((entry) => entry.id !== id);
+}
+
+/**
+ * Rewrites a definition's right-hand side, which is how a slider moves: the
+ * expression text stays the one place a value is written down.
+ */
+export function withValue(entry: ExpressionEntry, name: string, value: number, step: number): ExpressionEntry {
+  return { ...entry, source: `${name} = ${formatSliderValue(value, step)}` };
 }

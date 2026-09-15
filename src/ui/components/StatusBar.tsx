@@ -5,16 +5,17 @@ export interface StatusBarProps {
   readonly cursor: Point | null;
   readonly stats: RenderStats | null;
   readonly plotted: number;
+  readonly values: number;
   readonly problems: number;
 }
 
 /**
- * Bottom bar: pointer position, what is on screen, and the cost of the last
- * frame. The render stats are real measurements, which makes performance
- * regressions visible during development instead of after release.
+ * Bottom bar: pointer position, what the workspace currently holds, and the
+ * cost of the last frame. The render stats are real measurements, which makes
+ * performance regressions visible during development rather than after.
  */
 export function StatusBar(props: StatusBarProps): React.JSX.Element {
-  const { cursor, stats, plotted, problems } = props;
+  const { cursor, stats, plotted, values, problems } = props;
 
   return (
     <footer className="status-bar">
@@ -22,8 +23,10 @@ export function StatusBar(props: StatusBarProps): React.JSX.Element {
         {cursor === null ? 'x —, y —' : `x ${format(cursor.x)}, y ${format(cursor.y)}`}
       </span>
       <span className="status-item">
-        {plotted} plotted
-        {problems > 0 && <span className="status-problem"> · {problems} need attention</span>}
+        {plotted} plotted · {values} {values === 1 ? 'value' : 'values'}
+        {problems > 0 && (
+          <span className="status-problem"> · {problems} need attention</span>
+        )}
       </span>
       {stats !== null && (
         <span className="status-item mono">

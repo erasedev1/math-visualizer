@@ -4,7 +4,7 @@ An open-source, local-first mathematical and engineering workspace: a
 programmable canvas where mathematics, visualization and engineering
 calculations live in one environment.
 
-This repository is at **milestone 1**. What is described below as implemented
+This repository is at **milestone 2**. What is described below as implemented
 is implemented and tested; everything else is on the roadmap and deliberately
 absent from the interface.
 
@@ -21,15 +21,25 @@ absent from the interface.
   curves, drag to pan, wheel/pinch/keyboard zoom, per-axis zoom, and adaptive
   sampling that resolves high-frequency curves, breaks at domain edges and
   splits at poles.
+- A reactive workspace: named values (`a = 2`), named functions
+  (`f(x) = a sin(b x)`) and computed values (`p = f(3)`) that read each other
+  in any order. A change recomputes exactly the items that read it,
+  transitively, and nothing else. Cycles, unknown names and duplicate
+  definitions are reported per entry and recover as soon as they are fixed.
+- Sliders: any parameter defined as a plain number gets one, with editable
+  bounds, step and speed, and play/pause animation that sweeps back and forth.
+  Dragging rewrites the number in the expression, so the text stays the single
+  source of truth and everything downstream follows.
 - Appearance: per-curve colour, line width and visibility; light and dark
   themes.
-- 111 automated tests covering parsing, evaluation, printing, viewport
-  transforms, tick selection and sampling against analytical results.
+- 171 automated tests covering parsing, evaluation, printing, viewport
+  transforms, tick selection, sampling, dependency ordering, reactive
+  propagation and slider behaviour, checked against analytical results.
 
-**Not built yet** — reactive dependency graph, sliders, geometry, vectors,
-matrices, symbolic calculus, statistics, tables, notebook blocks, units,
-engineering modules, 3D, the AI tool layer, project files and undo/redo. The
-UI does not contain controls for any of them.
+**Not built yet** — geometry, vectors, matrices, symbolic calculus,
+statistics, tables, notebook blocks, units, engineering modules, 3D, the AI
+tool layer, project files and undo/redo. The UI does not contain controls for
+any of them.
 
 ## Running it
 
@@ -53,7 +63,8 @@ src/
   core/
     expression/   tokenizer, parser, AST, closure compiler, printer,
                   definition parser, function/constant registry
-    plot/         decides what a line of input means and compiles it
+    workspace/    dependency graph, reactive evaluation, slider behaviour
+    plot/         compiles an expression into a drawable curve
   rendering/
     2d/           viewport transforms, tick selection, adaptive sampler,
                   grid/axis renderer, curve renderer, scene entry point,
@@ -79,6 +90,20 @@ Three rules hold the design together, and the later milestones depend on them:
    reference all read, so adding `erf` or a unit-aware quantity type does not
    mean touching a parser.
 
+### How reactivity works
+
+Nothing in the application pushes an update at anything else. Each pass over
+the workspace reads every entry's declared name, works out what each entry
+reads, orders the work so dependencies come first, and recomputes only the
+entries a change can reach. Everything else is reused from the previous pass,
+including its compiled closures.
+
+That is why a dragged slider stays cheap as the workspace grows, and why
+`geometry`, `tables` and `notebook blocks` can join later as new kinds of node
+rather than as new update paths. The graph itself
+(`core/workspace/graph.ts`) is plain data over ids and knows nothing about
+expressions.
+
 ### Notable decisions
 
 - **Juxtaposition is multiplication, resolved against a function registry.**
@@ -98,13 +123,23 @@ Three rules hold the design together, and the later milestones depend on them:
   drift the aspect ratio.
 - **`log` is base 10 and `ln` is natural**, following engineering convention.
   Angles are in radians.
+- **A slider has no value of its own.** It writes its number back into the
+  expression that defines it, so there is exactly one place a value is
+  written down and a saved workspace will keep its slider positions for free.
+- **`x` and `y` name the plane, not variables.** `y = ...` is the conventional
+  way to write a graph and is drawn as one; `x = ...` would be a vertical
+  line, which is not a function of x, and says so rather than quietly
+  defining a variable that breaks every other entry.
+- **Whether `f(2)` is a call or a product depends on the workspace.** Names
+  are collected from every entry's header before any body is parsed, so
+  `a(x+1)` is a product until an `a(x) = ...` definition exists.
 
 ## Roadmap
 
 | Milestone | Scope |
 | --- | --- |
 | 1 ✅ | app shell, canvas, expression parser, function plotting, pan/zoom |
-| 2 | reactive dependency graph, variables, sliders |
+| 2 ✅ | reactive dependency graph, variables, sliders |
 | 3 | points, lines, circles, geometric relationships |
 | 4 | vectors, matrices, a matrix editor |
 | 5 | calculus, numerical methods, statistics |

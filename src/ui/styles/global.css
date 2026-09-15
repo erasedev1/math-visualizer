@@ -268,8 +268,9 @@ code {
   color: var(--danger);
 }
 
-.expression-row[data-state='unsupported'] .expression-status {
-  color: var(--warning);
+.expression-row[data-state='value'] .expression-status,
+.expression-row[data-state='function'] .expression-status {
+  color: var(--text-muted);
 }
 
 .row-action {
@@ -287,6 +288,95 @@ code {
 .row-action:hover {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.swatch-placeholder {
+  width: 14px;
+  height: 14px;
+  margin-top: 7px;
+}
+
+.swatch-placeholder::after {
+  display: block;
+  width: 5px;
+  height: 5px;
+  margin: 5px auto;
+  border-radius: 50%;
+  background: var(--border-strong);
+  content: '';
+}
+
+/* ---------- Sliders ---------- */
+
+.slider-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.slider-play {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.slider-play:hover,
+.slider-play[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.slider-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.slider-bound,
+.slider-value {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+
+.slider-value {
+  min-width: 44px;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.slider-settings {
+  margin: 4px 0 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+}
+
+.slider-settings .field {
+  margin-bottom: 6px;
+}
+
+.slider-settings .field:last-child {
+  margin-bottom: 0;
+}
+
+.slider-settings input[type='number'] {
+  width: 84px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface-raised);
+  font-family: var(--mono);
 }
 
 /* ---------- Canvas ---------- */

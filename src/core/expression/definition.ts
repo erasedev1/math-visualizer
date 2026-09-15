@@ -4,13 +4,7 @@ import { parse, parseExpression } from './parser';
 import { eofToken, tokenize, type Token } from './tokenizer';
 import type { ParseOptions } from './parser';
 
-/**
- * What a line of input means.
- *
- * Milestone 1 only graphs `function` and `expression` entries; `variable` is
- * recognised by the parser so the reactive layer can pick it up next, and the
- * UI reports it as not yet graphable rather than pretending otherwise.
- */
+/** What a line of input means. */
 export type Definition =
   /** `f(x) = ...` */
   | { readonly kind: 'function'; readonly name: string; readonly params: readonly string[]; readonly body: Expr }
@@ -54,6 +48,53 @@ export function parseDefinition(source: string, options: ParseOptions = {}): Def
     );
   }
   return { kind: 'expression', body: root };
+}
+
+/**
+ * The name a line defines, read from tokens alone.
+ *
+ * Parsing a body needs to know which names are functions (so that `f(2)` is a
+ * call rather than a product), but that set is only known once every line's
+ * header has been read. Header reading therefore has to work without parsing,
+ * which it can: a header is a fixed token pattern.
+ */
+export function readDefinitionHeader(source: string): DefinitionHeader | null {
+  let tokens: readonly Token[];
+  try {
+    tokens = tokenize(source);
+  } catch {
+    // A line that does not even tokenise defines nothing; the error surfaces
+    // when the line is parsed for real.
+    return null;
+  }
+
+  try {
+    const header = matchFunctionHeader(tokens);
+    if (header !== null) {
+      return { kind: 'function', name: header.name, params: header.params };
+    }
+  } catch {
+    return null;
+  }
+
+  const first = tokens[0];
+  const second = tokens[1];
+  if (
+    first?.type === 'identifier' &&
+    second?.type === 'operator' &&
+    second.value === '=' &&
+    tokens.length > 2
+  ) {
+    return { kind: 'variable', name: first.value, params: [] };
+  }
+
+  return null;
+}
+
+export interface DefinitionHeader {
+  readonly kind: 'function' | 'variable';
+  readonly name: string;
+  readonly params: readonly string[];
 }
 
 function bodyTokens(tokens: readonly Token[], from: number, source: string): Token[] {
