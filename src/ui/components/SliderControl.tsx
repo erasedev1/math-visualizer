@@ -2,7 +2,8 @@ import type { SliderConfig } from '@/core/workspace/slider';
 import { formatSliderValue, sliderDecimals } from '@/core/workspace/slider';
 
 export interface SliderControlProps {
-  readonly name: string;
+  /** Null for an entry that is a bare number rather than a definition. */
+  readonly name: string | null;
   readonly value: number;
   readonly config: SliderConfig;
   readonly onValueChange: (value: number) => void;
@@ -18,6 +19,7 @@ export interface SliderControlProps {
  */
 export function SliderControl(props: SliderControlProps): React.JSX.Element {
   const { name, value, config } = props;
+  const of = name === null ? '' : ` ${name}`;
 
   return (
     <div className="slider-control">
@@ -25,7 +27,7 @@ export function SliderControl(props: SliderControlProps): React.JSX.Element {
         type="button"
         className="slider-play"
         onClick={props.onTogglePlay}
-        aria-label={config.playing ? `Pause ${name}` : `Animate ${name}`}
+        aria-label={config.playing ? `Pause${of}` : `Animate${of}`}
         aria-pressed={config.playing}
         title={config.playing ? 'Pause' : 'Animate'}
       >
@@ -41,7 +43,7 @@ export function SliderControl(props: SliderControlProps): React.JSX.Element {
         max={config.max}
         step={config.step}
         value={clamp(value, config)}
-        aria-label={`Value of ${name}`}
+        aria-label={name === null ? 'Value' : `Value of ${name}`}
         onChange={(event) => props.onValueChange(Number(event.target.value))}
       />
 

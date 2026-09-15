@@ -216,11 +216,11 @@ export function App(): React.JSX.Element {
         const entry = previous.find((candidate) => candidate.id === id);
         const result = previousRef.current.results.get(id);
         if (entry === undefined || result?.kind !== 'value') return previous;
-        if (result.literal?.kind !== 'number' || result.name === null) return previous;
+        if (result.literal?.kind !== 'number') return previous;
         const config = normaliseSlider(entry.slider ?? defaultSliderFor(result.literal.value));
         const snapped = snapToSlider(value, config);
         return previous.map((candidate) =>
-          candidate.id === id ? withValue(candidate, result.name!, snapped, config.step) : candidate,
+          candidate.id === id ? withValue(candidate, result.name, snapped, config.step) : candidate,
         );
       });
     },
@@ -243,16 +243,17 @@ export function App(): React.JSX.Element {
     setEntries((previous) => {
       const entry = previous.find((candidate) => candidate.id === id);
       const result = previousRef.current.results.get(id);
-      if (entry === undefined || result?.kind !== 'value' || result.name === null) return previous;
+      if (entry === undefined || result?.kind !== 'value') return previous;
 
       const decimals = coordinateDecimals(viewportRef.current);
       const x = round(world.x, decimals);
       const y = round(world.y, decimals);
 
       if (result.literal?.kind === 'point') {
-        return updateEntry(previous, id, {
-          source: `${result.name} = (${formatNumber(x)}, ${formatNumber(y)})`,
-        });
+        const body = `(${formatNumber(x)}, ${formatNumber(y)})`;
+        return previous.map((candidate) =>
+          candidate.id === id ? withBody(candidate, result.name, body) : candidate,
+        );
       }
 
       if (result.literal?.kind === 'vector' && result.value.kind === 'vector') {
@@ -261,7 +262,7 @@ export function App(): React.JSX.Element {
         const { anchor } = result.value;
         const body = vectorSource([round(x - anchor.x, decimals), round(y - anchor.y, decimals)]);
         return previous.map((candidate) =>
-          candidate.id === id ? withBody(candidate, result.name!, body) : candidate,
+          candidate.id === id ? withBody(candidate, result.name, body) : candidate,
         );
       }
 
@@ -273,11 +274,9 @@ export function App(): React.JSX.Element {
   const handleMatrixChange = useCallback((id: string, rows: readonly (readonly number[])[]) => {
     setEntries((previous) => {
       const result = previousRef.current.results.get(id);
-      if (result?.kind !== 'value' || result.literal?.kind !== 'matrix' || result.name === null) {
-        return previous;
-      }
+      if (result?.kind !== 'value' || result.literal?.kind !== 'matrix') return previous;
       return previous.map((candidate) =>
-        candidate.id === id ? withBody(candidate, result.name!, matrixSource(rows)) : candidate,
+        candidate.id === id ? withBody(candidate, result.name, matrixSource(rows)) : candidate,
       );
     });
   }, []);
@@ -406,7 +405,6 @@ function advanceAll(
 
     const result = workspace.results.get(entry.id);
     if (result?.kind !== 'value' || result.literal?.kind !== 'number') return entry;
-    if (result.name === null) return entry;
 
     const step = advanceSlider(result.literal.value, config, seconds);
     changed = true;

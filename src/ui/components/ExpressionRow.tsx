@@ -83,7 +83,7 @@ export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
           }}
         />
 
-        {result.kind === 'value' && result.name !== null && slider !== null && (
+        {result.kind === 'value' && slider !== null && (
           <SliderControl
             name={result.name}
             value={result.literal?.kind === 'number' ? result.literal.value : 0}

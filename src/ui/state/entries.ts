@@ -106,13 +106,28 @@ export function removeEntry(
  * Rewrites a definition's right-hand side, which is how a slider moves: the
  * expression text stays the one place a value is written down.
  */
-export function withValue(entry: ExpressionEntry, name: string, value: number, step: number): ExpressionEntry {
-  return { ...entry, source: `${name} = ${formatSliderValue(value, step)}` };
+export function withValue(
+  entry: ExpressionEntry,
+  name: string | null,
+  value: number,
+  step: number,
+): ExpressionEntry {
+  return withBody(entry, name, formatSliderValue(value, step));
 }
 
-/** Rewrites a definition's right-hand side with arbitrary source text. */
-export function withBody(entry: ExpressionEntry, name: string, body: string): ExpressionEntry {
-  return { ...entry, source: `${name} = ${body}` };
+/**
+ * Rewrites an entry's body with new source text.
+ *
+ * An entry without a name is its body, so there is no `name =` to put back in
+ * front of it. Everything editable in place goes through here, which is why a
+ * bare `[[1, 2], [3, 4]]` is as editable as a named `M`.
+ */
+export function withBody(
+  entry: ExpressionEntry,
+  name: string | null,
+  body: string,
+): ExpressionEntry {
+  return { ...entry, source: name === null ? body : `${name} = ${body}` };
 }
 
 /** The source text for a matrix literal, one bracketed list per row. */
