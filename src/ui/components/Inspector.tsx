@@ -33,7 +33,7 @@ export function Inspector(props: InspectorProps): React.JSX.Element {
     result !== null && (resultCurve(result) !== null || resultShape(result) !== null);
 
   return (
-    <section className="panel inspector" aria-label="Inspector">
+    <section className="panel inspector" id="inspector-panel" aria-label="Inspector">
       <header className="panel-header">
         <h2>Inspector</h2>
       </header>

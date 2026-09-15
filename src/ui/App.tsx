@@ -18,6 +18,7 @@ import { formatNumber } from '@/core/expression/print';
 import { graphTheme, seriesColor, type ThemeName } from '@/rendering/2d/theme';
 import type { RenderStats, Scene } from '@/rendering/2d/scene';
 import { createViewport, equaliseAxes, type Point, type Viewport } from '@/rendering/2d/viewport';
+import { CanvasControls } from './components/CanvasControls';
 import { ExpressionPanel } from './components/ExpressionPanel';
 import { GraphCanvas } from './components/GraphCanvas';
 import { Inspector } from './components/Inspector';
@@ -66,6 +67,7 @@ export function App(): React.JSX.Element {
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
   const [theme, setTheme] = useState<ThemeName>(() => readTheme());
+  const [inspectorOpen, setInspectorOpen] = useState(true);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [stats, setStats] = useState<RenderStats | null>(null);
 
@@ -283,30 +285,7 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
-          <div>
-            <h1>Math Visualizer</h1>
-            <p>Interactive mathematical workspace</p>
-          </div>
-        </div>
-        <div className="header-actions">
-          <button type="button" className="ghost-button" onClick={handleResetView}>
-            Reset view
-          </button>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={toggleTheme}
-            aria-label="Toggle colour theme"
-          >
-            {theme === 'dark' ? 'Light theme' : 'Dark theme'}
-          </button>
-        </div>
-      </header>
-
-      <main className="app-body">
+      <main className="app-body" data-inspector={inspectorOpen ? 'open' : 'closed'}>
         <ExpressionPanel
           entries={entries}
           results={workspace.results}
@@ -324,17 +303,28 @@ export function App(): React.JSX.Element {
           onMatrixChange={handleMatrixChange}
         />
 
-        <GraphCanvas
-          viewport={viewport}
-          onViewportChange={setViewport}
-          scene={scene}
-          theme={theme}
-          initialSpanX={INITIAL_SPAN_X}
-          onCursorMove={setCursor}
-          onRender={setStats}
-          onPointDrag={handleObjectDrag}
-        />
+        <div className="canvas-area">
+          <GraphCanvas
+            viewport={viewport}
+            onViewportChange={setViewport}
+            scene={scene}
+            theme={theme}
+            initialSpanX={INITIAL_SPAN_X}
+            onCursorMove={setCursor}
+            onRender={setStats}
+            onPointDrag={handleObjectDrag}
+          />
 
+          <CanvasControls
+            theme={theme}
+            inspectorOpen={inspectorOpen}
+            onResetView={handleResetView}
+            onToggleTheme={toggleTheme}
+            onToggleInspector={() => setInspectorOpen((open) => !open)}
+          />
+        </div>
+
+        {inspectorOpen && (
         <Inspector
           entry={selectedEntry}
           result={selectedEntry === null ? null : workspace.results.get(selectedEntry.id) ?? null}
@@ -347,6 +337,7 @@ export function App(): React.JSX.Element {
           onResetView={handleResetView}
           onEqualiseAxes={() => setViewport(equaliseAxes)}
         />
+        )}
       </main>
 
       <StatusBar

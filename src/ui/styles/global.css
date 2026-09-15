@@ -86,51 +86,63 @@ code {
   height: 100%;
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 10px 16px;
-  background: var(--surface-raised);
-  border-bottom: 1px solid var(--border);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.brand-mark {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, var(--accent), #a78bfa);
-}
-
-.brand h1 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.brand p {
-  margin: 0;
-  font-size: 11px;
-  color: var(--text-faint);
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
+.app-shell {
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .app-body {
   display: grid;
   grid-template-columns: var(--panel-width) minmax(0, 1fr) var(--inspector-width);
   min-height: 0;
+}
+
+/* The inspector column disappears entirely when collapsed. */
+.app-body[data-inspector='closed'] {
+  grid-template-columns: var(--panel-width) minmax(0, 1fr);
+}
+
+/* ---------- Canvas area ---------- */
+
+.canvas-area {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+.canvas-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  /* The cluster must not block dragging or panning around the buttons. */
+  pointer-events: none;
+}
+
+.canvas-button {
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+
+.canvas-button:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.canvas-button.is-icon {
+  width: 28px;
+  padding: 4px 0;
+  font-size: 15px;
+  line-height: 1;
+  text-align: center;
 }
 
 /* ---------- Panels ---------- */
@@ -649,12 +661,9 @@ code {
 }
 
 @media (max-width: 1100px) {
-  .app-body {
-    grid-template-columns: 260px minmax(0, 1fr);
-  }
-
-  .inspector {
-    display: none;
+  :root {
+    --panel-width: 260px;
+    --inspector-width: 250px;
   }
 
   .status-hints {
