@@ -1,0 +1,122 @@
+# Math Visualizer
+
+An open-source, local-first mathematical and engineering workspace: a
+programmable canvas where mathematics, visualization and engineering
+calculations live in one environment.
+
+This repository is at **milestone 1**. What is described below as implemented
+is implemented and tested; everything else is on the roadmap and deliberately
+absent from the interface.
+
+## Status
+
+**Working today**
+
+- Expression engine: tokenizer, parser and a closure compiler for arithmetic,
+  variables, constants, function calls, powers, parentheses and implicit
+  multiplication (`2x`, `3(x+1)`, `2pi`, `sqrt(2x)`).
+- Entry forms: bare expressions (`x^2`), the conventional `y = ...`, and
+  function definitions (`f(x) = sin(x)`), graphed against their own variable.
+- Interactive 2D graphing: Cartesian grid, axes with 1-2-5 ticks, multiple
+  curves, drag to pan, wheel/pinch/keyboard zoom, per-axis zoom, and adaptive
+  sampling that resolves high-frequency curves, breaks at domain edges and
+  splits at poles.
+- Appearance: per-curve colour, line width and visibility; light and dark
+  themes.
+- 111 automated tests covering parsing, evaluation, printing, viewport
+  transforms, tick selection and sampling against analytical results.
+
+**Not built yet** — reactive dependency graph, sliders, geometry, vectors,
+matrices, symbolic calculus, statistics, tables, notebook blocks, units,
+engineering modules, 3D, the AI tool layer, project files and undo/redo. The
+UI does not contain controls for any of them.
+
+## Running it
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm test           # run the test suite
+npm run build      # typecheck and produce a production build
+```
+
+Requires Node 20 or newer.
+
+## Architecture
+
+The stack is Vite + React + TypeScript with Vitest, and no mathematics
+library: the engine is the product, so it is written and tested here rather
+than delegated.
+
+```
+src/
+  core/
+    expression/   tokenizer, parser, AST, closure compiler, printer,
+                  definition parser, function/constant registry
+    plot/         decides what a line of input means and compiles it
+  rendering/
+    2d/           viewport transforms, tick selection, adaptive sampler,
+                  grid/axis renderer, curve renderer, scene entry point,
+                  canvas themes
+  ui/
+    components/   expression panel, canvas, inspector, status bar
+    hooks/        element size, pointer/wheel/pinch navigation
+    state/        workspace entries
+tests/            mirrors src/, one suite per module
+```
+
+Three rules hold the design together, and the later milestones depend on them:
+
+1. **The engine does not know about the UI.** `core` and `rendering` have no
+   React and no DOM beyond a canvas context, so the same code can serve
+   export, a worker, or a headless test.
+2. **Data flows one way.** Entries are plain serialisable data; the scene is
+   derived from them by pure functions. Nothing mutates the graph directly,
+   which is what makes a dependency graph and an undo history addable rather
+   than retrofittable.
+3. **Behaviour is registry-driven, not switch-driven.** Functions and
+   constants live in one registry that the parser, compiler and on-screen
+   reference all read, so adding `erf` or a unit-aware quantity type does not
+   mean touching a parser.
+
+### Notable decisions
+
+- **Juxtaposition is multiplication, resolved against a function registry.**
+  `sin(x)` is a call and `a(x+1)` is a product, because the parser asks
+  whether the name is a known function. Identifiers are matched greedily, so
+  `xy` is one variable, not `x*y`.
+- **Compilation, not tree-walking.** Plotting evaluates an expression
+  thousands of times per frame, so the AST is compiled once into closures with
+  constant subtrees folded, and unknown names fail at compile time instead of
+  producing NaN at every sample.
+- **Sampling is adaptive and discontinuity-aware.** Uniform sampling aliases
+  `sin(50x)` and draws lines through the asymptotes of `tan(x)`; the sampler
+  refines on screen-space flatness and splits the polyline at domain edges and
+  poles.
+- **The viewport is a centre plus a scale.** Resizing the window then reveals
+  more of the plane instead of stretching it, and repeated zooming cannot
+  drift the aspect ratio.
+- **`log` is base 10 and `ln` is natural**, following engineering convention.
+  Angles are in radians.
+
+## Roadmap
+
+| Milestone | Scope |
+| --- | --- |
+| 1 ✅ | app shell, canvas, expression parser, function plotting, pan/zoom |
+| 2 | reactive dependency graph, variables, sliders |
+| 3 | points, lines, circles, geometric relationships |
+| 4 | vectors, matrices, a matrix editor |
+| 5 | calculus, numerical methods, statistics |
+| 6 | notebook/document blocks |
+| 7 | units and dimensional analysis, engineering modules |
+| 8 | 3D surfaces and parametric curves |
+| 9 | AI workspace tools (structured operations, not code edits) |
+| 10 | performance, export, documentation, polish |
+
+Each milestone leaves the application runnable, with tests, and without UI for
+features that do not work.
+
+## Licence
+
+MIT.

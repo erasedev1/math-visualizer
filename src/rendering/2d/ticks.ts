@@ -36,16 +36,37 @@ export function niceStep(rawStep: number): number {
   return mantissa * magnitude;
 }
 
+/** Mantissas considered when choosing a step. */
+const MANTISSAS = [1, 2, 5, 10] as const;
+
 /**
  * Chooses tick spacing for an axis.
+ *
+ * The candidate whose on-screen spacing is closest to the target is picked,
+ * measured on a log scale because tick spacing is multiplicative: always
+ * rounding the raw spacing up would leave labels twice as far apart as asked
+ * for whenever the raw value sits just above a candidate.
  *
  * @param pixelsPerUnit scale of the axis
  * @param targetSpacing preferred distance between labelled ticks, in pixels
  */
 export function tickScale(pixelsPerUnit: number, targetSpacing = 90): TickScale {
-  const step = niceStep(targetSpacing / Math.max(pixelsPerUnit, Number.MIN_VALUE));
-  const mantissa = Math.round(step / Math.pow(10, Math.floor(Math.log10(step))));
-  const divisions = MINOR_DIVISIONS[mantissa] ?? 5;
+  const raw = targetSpacing / Math.max(pixelsPerUnit, Number.MIN_VALUE);
+  if (!Number.isFinite(raw) || raw <= 0) return { step: 1, minorStep: 0.2 };
+
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
+  let best: number = MANTISSAS[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const mantissa of MANTISSAS) {
+    const distance = Math.abs(Math.log((mantissa * magnitude) / raw));
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = mantissa;
+    }
+  }
+
+  const step = best * magnitude;
+  const divisions = MINOR_DIVISIONS[best] ?? 5;
   return { step, minorStep: step / divisions };
 }
 

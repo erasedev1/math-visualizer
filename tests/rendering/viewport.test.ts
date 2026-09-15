@@ -10,7 +10,6 @@ import {
   toScreenX,
   toScreenY,
   toWorld,
-  toWorldX,
   zoomAt,
   zoomCenter,
   MAX_SCALE,

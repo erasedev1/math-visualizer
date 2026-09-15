@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   axisTicks,
-  decimalsForStep,
   formatTick,
   niceStep,
   tickScale,
@@ -27,13 +26,20 @@ describe('niceStep', () => {
 
 describe('tickScale', () => {
   it('keeps labelled ticks near the target pixel spacing', () => {
-    for (const pixelsPerUnit of [0.001, 0.37, 1, 40, 512, 1e6]) {
+    for (const pixelsPerUnit of [0.001, 0.37, 1, 40, 41, 512, 1e6]) {
       const { step } = tickScale(pixelsPerUnit, 90);
       const spacing = step * pixelsPerUnit;
-      // A 1-2-5 step can only land within a factor of the target.
-      expect(spacing).toBeGreaterThan(90 / 2.5);
-      expect(spacing).toBeLessThan(90 * 2.5);
+      // The worst case is a raw spacing halfway between two candidates, which
+      // is a factor of sqrt(5/2) ~ 1.58 away whichever one is chosen.
+      expect(spacing).toBeGreaterThan(90 / 1.6);
+      expect(spacing).toBeLessThan(90 * 1.6);
     }
+  });
+
+  it('prefers the nearest candidate rather than always rounding up', () => {
+    // At 41 px per unit a step of 5 would space labels 205 px apart; 2 is a
+    // much better fit for a 90 px target.
+    expect(tickScale(41, 90).step).toBe(2);
   });
 
   it('subdivides each step into whole minor divisions', () => {
@@ -69,9 +75,9 @@ describe('axisTicks', () => {
   it('returns major ticks, minor ticks and a label precision', () => {
     const ticks = axisTicks(-10, 10, 40);
     expect(ticks.major).toContain(0);
-    // At 40 px per unit and a 90 px target, the chosen step is 5.
-    expect(ticks.step).toBe(5);
-    expect(ticks.major).toEqual([-10, -5, 0, 5, 10]);
+    // At 40 px per unit and a 90 px target, the chosen step is 2.
+    expect(ticks.step).toBe(2);
+    expect(ticks.major).toEqual([-10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10]);
     expect(ticks.decimals).toBe(0);
     // Minor ticks never duplicate a major tick.
     for (const value of ticks.minor) expect(ticks.major).not.toContain(value);
