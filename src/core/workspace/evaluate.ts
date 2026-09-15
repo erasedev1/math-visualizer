@@ -17,8 +17,11 @@ import {
 } from '../expression/functions';
 import { toSource } from '../expression/print';
 import { compileCurve, type PlottableCurve } from '../plot/curve';
+import { evaluateValue } from '../values/evaluate';
+import { VALUE_FUNCTIONS } from '../values/functions';
+import { withArticle, type Value } from '../values/types';
 import { buildGraph, collectAffected, type DependencyGraph } from './graph';
-import type { ErrorResult, ItemResult, WorkspaceItem } from './types';
+import type { ErrorResult, ItemResult, LiteralForm, WorkspaceItem } from './types';
 
 /**
  * Evaluating a workspace.
@@ -74,7 +77,7 @@ export function evaluateWorkspace(
   const { names, functionNames, duplicates } = readHeaders(items);
   const functionKey = [...functionNames].sort().join(',');
   const isFunction = (name: string) =>
-    functionNames.has(name) || BUILTIN_FUNCTIONS.has(name);
+    functionNames.has(name) || isBuiltinFunction(name);
 
   const parsed = new Map<string, ParsedItem>();
   for (const item of items) {
@@ -98,6 +101,7 @@ export function evaluateWorkspace(
   // values they were compiled against.
   const constants: Record<string, number> = { ...BUILTIN_CONSTANTS };
   const functions = new Map(BUILTIN_FUNCTIONS);
+  const values = new Map<string, Value>();
 
   const byId = new Map(items.map((item) => [item.id, item]));
 
@@ -117,11 +121,13 @@ export function evaluateWorkspace(
         duplicate: duplicates.get(id) ?? null,
         constants,
         functions,
+        values,
+        results,
       });
 
     if (reusable === null) recomputed.add(id);
     results.set(id, result);
-    publish(result, constants, functions);
+    publish(result, constants, functions, values);
   }
 
   for (const id of graph.cycles) {
@@ -138,14 +144,23 @@ export function evaluateWorkspace(
   return { items, results, graph, names, recomputed, parsed };
 }
 
+/** True for any name the language already provides. */
+export function isBuiltinFunction(name: string): boolean {
+  return BUILTIN_FUNCTIONS.has(name) || VALUE_FUNCTIONS.has(name);
+}
+
 /** Adds a finished item's name to the scope later items are compiled against. */
 function publish(
   result: ItemResult,
   constants: Record<string, number>,
   functions: Map<string, FunctionDefinition>,
+  values: Map<string, Value>,
 ): void {
   if (result.kind === 'value') {
-    constants[result.name] = result.value;
+    if (result.name === null) return;
+    values.set(result.name, result.value);
+    // Only numbers reach the compiled numeric path that plotting uses.
+    if (result.value.kind === 'number') constants[result.name] = result.value.value;
     return;
   }
   if (result.kind === 'function') {
@@ -262,7 +277,7 @@ function resolve(
   const known = [...local, ...Object.keys(BUILTIN_CONSTANTS)];
   const referenced = [
     ...freeVariables(definition.body, known),
-    ...calledFunctions(definition.body).filter((name) => !BUILTIN_FUNCTIONS.has(name)),
+    ...calledFunctions(definition.body).filter((name) => !isBuiltinFunction(name)),
   ];
 
   const dependencies: string[] = [];
@@ -320,6 +335,8 @@ interface EvaluationContext {
   readonly duplicate: string | null;
   readonly constants: Readonly<Record<string, number>>;
   readonly functions: ReadonlyMap<string, FunctionDefinition>;
+  readonly values: ReadonlyMap<string, Value>;
+  readonly results: ReadonlyMap<string, ItemResult>;
 }
 
 function evaluateItem(
@@ -354,6 +371,8 @@ function evaluateItem(
       case 'function': {
         const unknown = entry.unresolved;
         if (unknown.length > 0) return unknownNames(id, dependencies, unknown);
+        const nonNumeric = firstNonNumericDependency(dependencies, context);
+        if (nonNumeric !== null) return nonNumeric(id, dependencies);
         const compiled = compile(definition.body, { ...scope, params: definition.params });
         const [only] = definition.params;
         return {
@@ -391,30 +410,66 @@ function evaluateItem(
         if (entry.unresolved.length > 0) {
           return unknownNames(id, dependencies, entry.unresolved);
         }
-        const value = compile(definition.body, scope)();
-        return {
-          kind: 'value',
-          id,
-          dependencies,
-          name: definition.name,
-          value,
-          literal: literalNumber(definition.body),
-        };
+        return asValue(id, dependencies, definition.name, definition.body, context);
       }
 
       case 'expression':
-        return asCurve(
-          id,
-          dependencies,
-          definition.body,
-          entry.unresolved,
-          toSource(definition.body),
-          scope,
-        );
+        // A name still free is the axis the expression is graphed against;
+        // an expression with nothing free is a value the workspace can hold.
+        return entry.unresolved.length > 0
+          ? asCurve(
+              id,
+              dependencies,
+              definition.body,
+              entry.unresolved,
+              toSource(definition.body),
+              scope,
+            )
+          : asValue(id, dependencies, null, definition.body, context);
     }
   } catch (caught) {
     return toErrorResult(id, dependencies, caught);
   }
+}
+
+/** Evaluates a fully determined expression to a number, a point or a shape. */
+function asValue(
+  id: string,
+  dependencies: readonly string[],
+  name: string | null,
+  body: Expr,
+  context: EvaluationContext,
+): ItemResult {
+  const value = evaluateValue(body, {
+    values: context.values,
+    constants: context.constants,
+    functions: context.functions,
+  });
+  return { kind: 'value', id, dependencies, name, value, literal: literalForm(body) };
+}
+
+/**
+ * A curve is compiled on the unboxed numeric path, so a name bound to a point
+ * or a shape cannot appear in one. Saying which name, and what it is, beats
+ * the compiler's "unknown name".
+ */
+function firstNonNumericDependency(
+  dependencies: readonly string[],
+  context: EvaluationContext,
+): ((id: string, dependencies: readonly string[]) => ErrorResult) | null {
+  for (const dependency of dependencies) {
+    const result = context.results.get(dependency);
+    if (result?.kind !== 'value' || result.value.kind === 'number') continue;
+    const described = withArticle(result.value.kind);
+    const label = result.name ?? 'a value';
+    return (id, deps) =>
+      error(
+        id,
+        deps,
+        `This reads "${label}", which is ${described}; curves are functions of numbers for now`,
+      );
+  }
+  return null;
 }
 
 /**
@@ -443,7 +498,22 @@ function asCurve(
   };
 }
 
-/** The number written in the source, when the body is nothing but a number. */
+/** The literal written in the source, when the body is nothing but one. */
+function literalForm(body: Expr): LiteralForm | null {
+  const asNumber = literalNumber(body);
+  if (asNumber !== null) return { kind: 'number', value: asNumber };
+
+  if (body.type === 'Tuple' && body.elements.length === 2) {
+    const [first, second] = body.elements as [Expr, Expr];
+    const x = literalNumber(first);
+    const y = literalNumber(second);
+    if (x !== null && y !== null) return { kind: 'point', x, y };
+  }
+
+  return null;
+}
+
+/** The number written in the source, when the expression is nothing but one. */
 function literalNumber(body: Expr): number | null {
   if (body.type === 'Number') return body.value;
   if (body.type === 'Unary' && body.argument.type === 'Number') {

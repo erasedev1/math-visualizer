@@ -43,6 +43,9 @@ function print(node: Expr): string {
     case 'Call':
       return `${node.callee}(${node.args.map(print).join(', ')})`;
 
+    case 'Tuple':
+      return `(${node.elements.map(print).join(', ')})`;
+
     case 'Unary':
       return `${node.operator}${operand(node.argument, UNARY_PRECEDENCE, false, 'right')}`;
 
@@ -85,6 +88,7 @@ function precedenceOf(node: Expr): number {
       return node.value < 0 ? UNARY_PRECEDENCE : ATOM_PRECEDENCE;
     case 'Identifier':
     case 'Call':
+    case 'Tuple':
       return ATOM_PRECEDENCE;
   }
 }
@@ -114,4 +118,15 @@ export function formatNumber(value: number): string {
   if (value === -Infinity) return '-infinity';
   if (Number.isInteger(value) && Math.abs(value) < 1e15) return String(value);
   return String(Number(value.toPrecision(12)));
+}
+
+/**
+ * A number for reading rather than for re-parsing: fewer significant digits,
+ * so a readout stays legible. `formatNumber` remains the exact form used
+ * where the text must round-trip back into an expression.
+ */
+export function formatDisplayNumber(value: number, significant = 6): string {
+  if (!Number.isFinite(value)) return formatNumber(value);
+  if (Number.isInteger(value) && Math.abs(value) < 1e15) return String(value);
+  return String(Number(value.toPrecision(significant)));
 }

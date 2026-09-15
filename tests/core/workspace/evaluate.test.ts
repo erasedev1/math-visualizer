@@ -18,6 +18,18 @@ function valueOf(state: WorkspaceState, id: string): number {
   if (result.kind !== 'value') {
     throw new Error(`${id} is ${result.kind}: ${JSON.stringify(result)}`);
   }
+  if (result.value.kind !== 'number') {
+    throw new Error(`${id} holds ${result.value.kind}, not a number`);
+  }
+  return result.value.value;
+}
+
+/** The value of a geometric entry, whatever its kind. */
+function shapeOf(state: WorkspaceState, id: string) {
+  const result = get(state, id);
+  if (result.kind !== 'value') {
+    throw new Error(`${id} is ${result.kind}: ${JSON.stringify(result)}`);
+  }
   return result.value;
 }
 
@@ -40,7 +52,7 @@ describe('evaluateWorkspace', () => {
     expect(valueOf(state, 'a')).toBe(2);
     const result = get(state, 'a');
     expect(result.kind === 'value' && result.name).toBe('a');
-    expect(result.kind === 'value' && result.literal).toBe(2);
+    expect(result.kind === 'value' && result.literal).toEqual({ kind: 'number', value: 2 });
   });
 
   it('marks a computed value as having no literal to drag', () => {
@@ -53,7 +65,7 @@ describe('evaluateWorkspace', () => {
   it('treats a negated number as a literal', () => {
     const state = evaluateWorkspace(workspace(['a', 'a = -3.5']));
     const result = get(state, 'a');
-    expect(result.kind === 'value' && result.literal).toBe(-3.5);
+    expect(result.kind === 'value' && result.literal).toEqual({ kind: 'number', value: -3.5 });
   });
 
   it('resolves a function against workspace variables', () => {
@@ -159,9 +171,15 @@ describe('evaluateWorkspace', () => {
     expect(state.names.has('y')).toBe(false);
   });
 
-  it('plots a determined expression as a level line', () => {
+  it('evaluates an expression with nothing free as a value, like a calculator', () => {
     const state = evaluateWorkspace(workspace(['a', 'a = 2'], ['e', 'a + 1']));
-    const curve = curveOf(state, 'e');
+    expect(valueOf(state, 'e')).toBe(3);
+    const result = get(state, 'e');
+    expect(result.kind === 'value' && result.name).toBeNull();
+  });
+
+  it('still draws y = c as a level line', () => {
+    const curve = curveOf(evaluateWorkspace(workspace(['e', 'y = 3'])), 'e');
     expect(curve.evaluate(-100)).toBe(3);
     expect(curve.evaluate(100)).toBe(3);
   });
@@ -256,6 +274,93 @@ describe('evaluateWorkspace', () => {
 
     const asCall = evaluateWorkspace(workspace(['a', 'a(x) = x + 1'], ['e', 'a(x + 1)']));
     expect(curveOf(asCall, 'e').evaluate(1)).toBe(3);
+  });
+
+  it('holds a point and keeps it draggable', () => {
+    const state = evaluateWorkspace(workspace(['A', 'A = (3, -4)']));
+    expect(shapeOf(state, 'A')).toEqual({ kind: 'point', x: 3, y: -4 });
+    const result = get(state, 'A');
+    expect(result.kind === 'value' && result.literal).toEqual({ kind: 'point', x: 3, y: -4 });
+  });
+
+  it('marks a computed point as not directly draggable', () => {
+    const state = evaluateWorkspace(
+      workspace(['A', 'A = (0, 0)'], ['B', 'B = (4, 2)'], ['M', 'M = midpoint(A, B)']),
+    );
+    expect(shapeOf(state, 'M')).toEqual({ kind: 'point', x: 2, y: 1 });
+    const result = get(state, 'M');
+    expect(result.kind === 'value' && result.literal).toBeNull();
+  });
+
+  it('propagates a moved point through every construction that reads it', () => {
+    const items = workspace(
+      ['A', 'A = (0, 0)'],
+      ['B', 'B = (4, 0)'],
+      ['M', 'M = midpoint(A, B)'],
+      ['s', 's = segment(A, B)'],
+      ['d', 'd = distance(A, B)'],
+    );
+    const first = evaluateWorkspace(items);
+    expect(valueOf(first, 'd')).toBe(4);
+
+    const moved = items.map((item) => (item.id === 'B' ? { ...item, source: 'B = (10, 0)' } : item));
+    const second = evaluateWorkspace(moved, first);
+
+    expect(shapeOf(second, 'M')).toEqual({ kind: 'point', x: 5, y: 0 });
+    expect(valueOf(second, 'd')).toBe(10);
+    expect(shapeOf(second, 's')).toMatchObject({ kind: 'line', form: 'segment', to: { x: 10, y: 0 } });
+    // Only what reads B is recomputed.
+    expect([...second.recomputed].sort()).toEqual(['B', 'M', 'd', 's']);
+  });
+
+  it('builds a construction several layers deep', () => {
+    const state = evaluateWorkspace(
+      workspace(
+        ['A', 'A = (0, 0)'],
+        ['B', 'B = (4, 2)'],
+        ['l', 'l = line(A, B)'],
+        ['M', 'M = midpoint(A, B)'],
+        ['p', 'p = perpendicular(l, M)'],
+        ['X', 'X = intersect(l, p)'],
+      ),
+    );
+    const foot = shapeOf(state, 'X');
+    expect(foot.kind === 'point' && foot.x).toBeCloseTo(2, 12);
+    expect(foot.kind === 'point' && foot.y).toBeCloseTo(1, 12);
+  });
+
+  it('reports a geometric failure on the entry that caused it', () => {
+    const state = evaluateWorkspace(
+      workspace(
+        ['a', 'a = line((0,0), (1,0))'],
+        ['b', 'b = line((0,1), (1,1))'],
+        ['X', 'X = intersect(a, b)'],
+      ),
+    );
+    expect(messageOf(state, 'X')).toMatch(/parallel/);
+  });
+
+  it('explains that a curve cannot read a point', () => {
+    const state = evaluateWorkspace(workspace(['A', 'A = (1, 2)'], ['f', 'f(x) = A x']));
+    expect(messageOf(state, 'f')).toMatch(/which is a point/);
+  });
+
+  it('reports a type error in arithmetic', () => {
+    const state = evaluateWorkspace(workspace(['A', 'A = (1, 2)'], ['q', 'q = A + 1']));
+    expect(messageOf(state, 'q')).toMatch(/add a point and a number/);
+  });
+
+  it('lets a point be built from numbers that are themselves sliders', () => {
+    const items = workspace(['t', 't = 1'], ['A', 'A = (t, t^2)']);
+    const first = evaluateWorkspace(items);
+    expect(shapeOf(first, 'A')).toEqual({ kind: 'point', x: 1, y: 1 });
+
+    const moved = items.map((item) => (item.id === 't' ? { ...item, source: 't = 3' } : item));
+    const second = evaluateWorkspace(moved, first);
+    expect(shapeOf(second, 'A')).toEqual({ kind: 'point', x: 3, y: 9 });
+    // A point built from an expression is not a literal, so it cannot be dragged.
+    const result = get(second, 'A');
+    expect(result.kind === 'value' && result.literal).toBeNull();
   });
 
   it('handles an empty workspace', () => {

@@ -4,6 +4,7 @@ import {
   equality,
   id,
   num,
+  tuple,
   unary,
   type Expr,
   type Root,
@@ -179,9 +180,14 @@ class Parser {
 
       case 'lparen': {
         this.next();
-        const inner = this.parseExpression();
+        const elements = [this.parseExpression()];
+        while (this.peek().type === 'comma') {
+          this.next();
+          elements.push(this.parseExpression());
+        }
         this.expect('rparen', '")"');
-        return inner;
+        // One element is grouping; more is a coordinate pair.
+        return elements.length === 1 ? elements[0]! : tuple(elements);
       }
 
       case 'operator':

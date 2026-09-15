@@ -1,4 +1,7 @@
+export * from './clip';
 export * from './curves';
+export * from './objects';
+export * from './pick';
 export * from './grid';
 export * from './sampler';
 export * from './scene';

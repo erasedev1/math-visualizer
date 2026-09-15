@@ -4,7 +4,7 @@ An open-source, local-first mathematical and engineering workspace: a
 programmable canvas where mathematics, visualization and engineering
 calculations live in one environment.
 
-This repository is at **milestone 2**. What is described below as implemented
+This repository is at **milestone 3**. What is described below as implemented
 is implemented and tested; everything else is on the roadmap and deliberately
 absent from the interface.
 
@@ -30,16 +30,31 @@ absent from the interface.
   bounds, step and speed, and play/pause animation that sweeps back and forth.
   Dragging rewrites the number in the expression, so the text stays the single
   source of truth and everything downstream follows.
-- Appearance: per-curve colour, line width and visibility; light and dark
+- Interactive geometry: points written `A = (3, 4)`, plus `line`, `segment`,
+  `ray`, `circle`, `polygon`, `midpoint`, `distance`, `angle`, `intersect`,
+  `perpendicular`, `parallel`, `area` and `perimeter`. Points can be dragged on
+  the canvas, and every construction that reads them follows. Constructions
+  compose, so `intersect(l, perpendicular(l, midpoint(A, B)))` is the foot of
+  the perpendicular bisector and stays that way as A moves.
+- Point arithmetic: `(A + B)/2` means the same as `midpoint(A, B)`, and
+  anything without a meaning (`A * B`, `A + 1`) is a type error naming both
+  kinds rather than a silent NaN.
+- Appearance: per-object colour, line width and visibility; light and dark
   themes.
-- 171 automated tests covering parsing, evaluation, printing, viewport
-  transforms, tick selection, sampling, dependency ordering, reactive
-  propagation and slider behaviour, checked against analytical results.
+- 252 automated tests covering parsing, evaluation, printing, viewport
+  transforms, tick selection, sampling, clipping, picking, dependency
+  ordering, reactive propagation, plane geometry and slider behaviour, checked
+  against analytical results.
 
-**Not built yet** — geometry, vectors, matrices, symbolic calculus,
-statistics, tables, notebook blocks, units, engineering modules, 3D, the AI
-tool layer, project files and undo/redo. The UI does not contain controls for
-any of them.
+**Not built yet** — vectors, matrices, symbolic calculus, statistics, tables,
+notebook blocks, units, engineering modules, 3D, the AI tool layer, project
+files and undo/redo. The UI does not contain controls for any of them.
+
+**Known limits at this milestone** — a curve is compiled on the unboxed
+numeric path, so a function cannot yet read a point (`f(x) = distance(A, (x, 0))`
+reports this rather than failing obscurely). Intersections are between lines,
+rays and segments; circle intersections need a value that can hold two points,
+which arrives with vectors.
 
 ## Running it
 
@@ -63,12 +78,14 @@ src/
   core/
     expression/   tokenizer, parser, AST, closure compiler, printer,
                   definition parser, function/constant registry
+    values/       the value domain: numbers, points, lines, circles,
+                  polygons, plane geometry, and the geometry functions
     workspace/    dependency graph, reactive evaluation, slider behaviour
     plot/         compiles an expression into a drawable curve
   rendering/
     2d/           viewport transforms, tick selection, adaptive sampler,
-                  grid/axis renderer, curve renderer, scene entry point,
-                  canvas themes
+                  grid/axis renderer, curve and object renderers, line
+                  clipping, point picking, scene entry point, canvas themes
   ui/
     components/   expression panel, canvas, inspector, status bar
     hooks/        element size, pointer/wheel/pinch navigation
@@ -133,6 +150,17 @@ expressions.
 - **Whether `f(2)` is a call or a product depends on the workspace.** Names
   are collected from every entry's header before any body is parsed, so
   `a(x+1)` is a product until an `a(x) = ...` definition exists.
+- **Values are boxed; curves are not.** Workspace values are computed once per
+  change by a tree-walking evaluator over a tagged union, while curves are
+  sampled thousands of times per frame and stay on the compiled, unboxed
+  numeric path. Neither pays for the other.
+- **Dragging a point is the same mechanism as dragging a slider.** Both
+  rewrite the literal in the expression that defines the object, and only
+  literals can be dragged: `M = midpoint(A, B)` has no halo and does not move,
+  because its position is a consequence rather than a choice.
+- **The renderer keeps its own shape types.** It never imports the value
+  union, so drawing stays independent of how values are modelled; one function
+  in the UI translates between them.
 
 ## Roadmap
 
@@ -140,7 +168,7 @@ expressions.
 | --- | --- |
 | 1 ✅ | app shell, canvas, expression parser, function plotting, pan/zoom |
 | 2 ✅ | reactive dependency graph, variables, sliders |
-| 3 | points, lines, circles, geometric relationships |
+| 3 ✅ | points, lines, circles, geometric relationships |
 | 4 | vectors, matrices, a matrix editor |
 | 5 | calculus, numerical methods, statistics |
 | 6 | notebook/document blocks |

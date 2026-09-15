@@ -394,6 +394,12 @@ code {
   cursor: grabbing;
 }
 
+/* Set directly by the drag hook when a movable object is under the pointer. */
+.graph-canvas[data-hover='object'],
+.graph-canvas[data-hover='object']:active {
+  cursor: move;
+}
+
 .graph-canvas canvas {
   display: block;
   width: 100%;
@@ -500,11 +506,20 @@ code {
   background: var(--surface-sunken);
 }
 
+.reference-heading {
+  margin: 10px 0 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
 .reference-list {
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 260px;
+  max-height: 240px;
   overflow-y: auto;
   font-size: 12px;
 }

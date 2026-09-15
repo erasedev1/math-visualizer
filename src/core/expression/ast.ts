@@ -34,6 +34,12 @@ export interface BinaryNode {
   readonly implicit: boolean;
 }
 
+/** `(3, 4)`: a coordinate pair, and later a vector. */
+export interface TupleNode {
+  readonly type: 'Tuple';
+  readonly elements: readonly Expr[];
+}
+
 export interface CallNode {
   readonly type: 'Call';
   readonly callee: string;
@@ -41,7 +47,13 @@ export interface CallNode {
 }
 
 /** An expression that can be evaluated to a number. */
-export type Expr = NumberNode | IdentifierNode | UnaryNode | BinaryNode | CallNode;
+export type Expr =
+  | NumberNode
+  | IdentifierNode
+  | UnaryNode
+  | BinaryNode
+  | CallNode
+  | TupleNode;
 
 /** `lhs = rhs`. Only valid at the top level of a source string. */
 export interface EqualityNode {
@@ -69,6 +81,11 @@ export const binary = (
   right: Expr,
   implicit = false,
 ): BinaryNode => ({ type: 'Binary', operator, left, right, implicit });
+
+export const tuple = (elements: readonly Expr[]): TupleNode => ({
+  type: 'Tuple',
+  elements,
+});
 
 export const call = (callee: string, args: readonly Expr[]): CallNode => ({
   type: 'Call',
@@ -99,6 +116,8 @@ export function children(node: Root): readonly Expr[] {
       return [node.left, node.right];
     case 'Call':
       return node.args;
+    case 'Tuple':
+      return node.elements;
   }
 }
 

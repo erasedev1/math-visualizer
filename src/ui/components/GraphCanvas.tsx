@@ -10,7 +10,9 @@ import {
   type Point,
   type Viewport,
 } from '@/rendering/2d/viewport';
+import { pickPoint } from '@/rendering/2d/pick';
 import { useElementSize } from '@/ui/hooks/useElementSize';
+import { useObjectDrag } from '@/ui/hooks/useObjectDrag';
 import { usePointerNavigation } from '@/ui/hooks/usePointerNavigation';
 
 export interface GraphCanvasProps {
@@ -25,6 +27,8 @@ export interface GraphCanvasProps {
   readonly initialSpanX: number;
   readonly onCursorMove?: (world: Point | null) => void;
   readonly onRender?: (stats: RenderStats) => void;
+  /** Called with the new world position while a point is being dragged. */
+  readonly onPointDrag?: (id: string, world: Point) => void;
 }
 
 /** How long after the last gesture the scene is redrawn at full quality. */
@@ -39,7 +43,16 @@ const SETTLE_MS = 140;
  * and then redrawn sharply once the view settles.
  */
 export function GraphCanvas(props: GraphCanvasProps): React.JSX.Element {
-  const { viewport, onViewportChange, scene, theme, initialSpanX, onCursorMove, onRender } = props;
+  const {
+    viewport,
+    onViewportChange,
+    scene,
+    theme,
+    initialSpanX,
+    onCursorMove,
+    onRender,
+    onPointDrag,
+  } = props;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -53,10 +66,39 @@ export function GraphCanvas(props: GraphCanvasProps): React.JSX.Element {
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
 
+  // Picking reads the current scene and viewport through refs, so the
+  // callbacks stay stable and the listeners are not rebound on every frame.
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
+
+  const pick = useCallback(
+    (local: Point) =>
+      onPointDrag === undefined
+        ? null
+        : pickPoint(sceneRef.current.objects, local, viewportRef.current),
+    [onPointDrag],
+  );
+
+  const handleDrag = useCallback(
+    (id: string, local: Point) => {
+      onPointDrag?.(id, toWorld(viewportRef.current, local));
+    },
+    [onPointDrag],
+  );
+
+  useObjectDrag(containerRef, {
+    pick,
+    onDrag: handleDrag,
+    onDragChange: setInteracting,
+  });
+
+  const canPan = useCallback((local: Point) => pick(local) === null, [pick]);
+
   usePointerNavigation(containerRef, {
     viewportRef,
     onChange: onViewportChange,
     onInteractingChange: setInteracting,
+    canPan,
   });
 
   // The first real layout sets the framing; later ones only reveal more of the

@@ -1,7 +1,8 @@
-import { formatNumber } from '@/core/expression/print';
+import { formatDisplayNumber, formatNumber } from '@/core/expression/print';
+import { describeValue } from '@/core/values/types';
 import type { WorkspaceState } from '@/core/workspace/evaluate';
 import type { ItemResult } from '@/core/workspace/types';
-import { resultCurve } from '@/core/workspace/types';
+import { resultCurve, resultShape } from '@/core/workspace/types';
 import type { SliderConfig } from '@/core/workspace/slider';
 import { bounds, type Viewport } from '@/rendering/2d/viewport';
 import {
@@ -28,7 +29,8 @@ export interface InspectorProps {
 export function Inspector(props: InspectorProps): React.JSX.Element {
   const { entry, result, slider, workspace, entries, palette, viewport } = props;
   const view = bounds(viewport);
-  const drawable = result !== null && resultCurve(result) !== null;
+  const drawable =
+    result !== null && (resultCurve(result) !== null || resultShape(result) !== null);
 
   return (
     <section className="panel inspector" aria-label="Inspector">
@@ -149,7 +151,8 @@ function Dependencies(props: {
 
   const label = (id: string) => {
     const other = workspace.results.get(id);
-    if (other?.kind === 'value' || other?.kind === 'function') return other.name;
+    if (other?.kind === 'function') return other.name;
+    if (other?.kind === 'value' && other.name !== null) return other.name;
     const index = entries.findIndex((entry) => entry.id === id);
     return index >= 0 ? `line ${index + 1}` : id;
   };
@@ -225,8 +228,10 @@ function SliderSettings(props: {
 
 function describeEntry(result: ItemResult): string {
   switch (result.kind) {
-    case 'value':
-      return `${result.name} = ${formatNumber(result.value)}`;
+    case 'value': {
+      const described = describeValue(result.value, formatDisplayNumber);
+      return result.name === null ? described : `${result.name} = ${described}`;
+    }
     case 'function':
       return `${result.name}(${result.params.join(', ')})`;
     case 'curve':
@@ -240,7 +245,9 @@ function describeEntry(result: ItemResult): string {
 function describeStatus(result: ItemResult): string {
   switch (result.kind) {
     case 'value':
-      return result.literal === null ? 'computed value' : 'parameter';
+      if (result.literal?.kind === 'number') return 'parameter';
+      if (result.literal?.kind === 'point') return 'free point, drag it on the canvas';
+      return result.value.kind === 'number' ? 'computed value' : `computed ${result.value.kind}`;
     case 'function':
       return result.curve === null ? 'defined (not graphable in 2D)' : 'plotted';
     case 'curve':

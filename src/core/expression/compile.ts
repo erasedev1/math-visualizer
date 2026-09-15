@@ -104,6 +104,11 @@ function compileNode(
       return { fn: apply, constant: false };
     }
 
+    case 'Tuple':
+      throw new ExpressionError(
+        `A ${node.elements.length === 2 ? 'point' : 'list'} cannot be used where a number is expected`,
+      );
+
     case 'Call': {
       const definition = functions.get(node.callee);
       if (definition === undefined) {

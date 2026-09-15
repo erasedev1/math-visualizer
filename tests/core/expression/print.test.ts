@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parse, parseExpression } from '@/core/expression/parser';
-import { formatNumber, toSource } from '@/core/expression/print';
+import { formatDisplayNumber, formatNumber, toSource } from '@/core/expression/print';
 
 /** Printing then re-parsing must produce the same tree. */
 function expectRoundTrip(source: string): string {
@@ -75,5 +75,26 @@ describe('formatNumber', () => {
   it('prints non-finite values readably', () => {
     expect(formatNumber(Infinity)).toBe('infinity');
     expect(formatNumber(NaN)).toBe('NaN');
+  });
+});
+
+describe('formatDisplayNumber', () => {
+  it('keeps integers exact', () => {
+    expect(formatDisplayNumber(42)).toBe('42');
+    expect(formatDisplayNumber(-7)).toBe('-7');
+  });
+
+  it('shortens long decimals for reading', () => {
+    expect(formatDisplayNumber(5.147815070493501)).toBe('5.14782');
+    expect(formatDisplayNumber(1 / 3)).toBe('0.333333');
+  });
+
+  it('is shorter than the round-trip form', () => {
+    expect(formatDisplayNumber(Math.PI).length).toBeLessThan(formatNumber(Math.PI).length);
+  });
+
+  it('passes non-finite values through', () => {
+    expect(formatDisplayNumber(Infinity)).toBe('infinity');
+    expect(formatDisplayNumber(NaN)).toBe('NaN');
   });
 });

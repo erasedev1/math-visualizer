@@ -10,6 +10,8 @@ export interface PointerNavigationOptions {
   readonly onChange: (next: Viewport) => void;
   /** Called when a gesture starts and ends, so rendering can drop quality. */
   readonly onInteractingChange?: (interacting: boolean) => void;
+  /** Declines a pan, so that dragging an object wins over moving the view. */
+  readonly canPan?: (local: ActivePointer) => boolean;
 }
 
 interface ActivePointer {
@@ -27,7 +29,7 @@ export function usePointerNavigation(
   target: RefObject<HTMLElement | null>,
   options: PointerNavigationOptions,
 ): void {
-  const { viewportRef, onChange, onInteractingChange } = options;
+  const { viewportRef, onChange, onInteractingChange, canPan } = options;
   const pointers = useRef(new Map<number, ActivePointer>());
   const pinchDistance = useRef<number | null>(null);
 
@@ -47,6 +49,7 @@ export function usePointerNavigation(
 
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0 && event.pointerType === 'mouse') return;
+      if (canPan !== undefined && !canPan(localPoint(event))) return;
       element.setPointerCapture(event.pointerId);
       pointers.current.set(event.pointerId, localPoint(event));
       if (pointers.current.size === 1) setInteracting(true);
@@ -128,5 +131,5 @@ export function usePointerNavigation(
       element.removeEventListener('wheel', onWheel);
       pointers.current.clear();
     };
-  }, [target, viewportRef, onChange, setInteracting]);
+  }, [target, viewportRef, onChange, setInteracting, canPan]);
 }

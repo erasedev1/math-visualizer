@@ -11,7 +11,10 @@ import {
   snapToSlider,
   type SliderConfig,
 } from '@/core/workspace/slider';
-import { resultCurve } from '@/core/workspace/types';
+import { resultCurve, resultShape } from '@/core/workspace/types';
+import type { Value } from '@/core/values/types';
+import type { SceneObject } from '@/rendering/2d/objects';
+import { formatNumber } from '@/core/expression/print';
 import { graphTheme, seriesColor, type ThemeName } from '@/rendering/2d/theme';
 import type { RenderStats, Scene } from '@/rendering/2d/scene';
 import { createViewport, equaliseAxes, type Point, type Viewport } from '@/rendering/2d/viewport';
@@ -29,7 +32,15 @@ import {
   type ExpressionEntry,
 } from './state/entries';
 
-const INITIAL_SOURCES = ['a = 2', 'b = 3', 'f(x) = a sin(b x)', 'x^2'];
+const INITIAL_SOURCES = [
+  'a = 2',
+  'f(x) = a sin(x)',
+  'A = (-4, -2)',
+  'B = (5, 3)',
+  's = segment(A, B)',
+  'M = midpoint(A, B)',
+  'c = circle(M, A)',
+];
 
 function initialEntries(): ExpressionEntry[] {
   return INITIAL_SOURCES.map((source, index) => createEntry(source, index));
@@ -46,6 +57,10 @@ export function App(): React.JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>(initialViewport);
+  // Dragging reads the live viewport to decide how precisely to write
+  // coordinates, without making the drag callback change every frame.
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
   const [theme, setTheme] = useState<ThemeName>(() => readTheme());
   const [cursor, setCursor] = useState<Point | null>(null);
   const [stats, setStats] = useState<RenderStats | null>(null);
@@ -71,8 +86,8 @@ export function App(): React.JSX.Element {
   const sliderOf = useCallback(
     (entry: ExpressionEntry): SliderConfig | null => {
       const result = workspace.results.get(entry.id);
-      if (result?.kind !== 'value' || result.literal === null) return null;
-      return normaliseSlider(entry.slider ?? defaultSliderFor(result.value));
+      if (result?.kind !== 'value' || result.literal?.kind !== 'number') return null;
+      return normaliseSlider(entry.slider ?? defaultSliderFor(result.literal.value));
     },
     [workspace],
   );
@@ -90,7 +105,20 @@ export function App(): React.JSX.Element {
         },
       ];
     });
-    return { curves };
+
+    const objects = entries.flatMap((entry) => {
+      const result = workspace.results.get(entry.id);
+      const shape = result === undefined ? null : resultShape(result);
+      if (!entry.visible || shape === null || result?.kind !== 'value') return [];
+      const style = {
+        color: colorOf(entry),
+        width: entry.lineWidth,
+        ...(result.name === null ? {} : { label: result.name }),
+      };
+      return toSceneObjects(entry.id, shape, style, result.literal?.kind === 'point');
+    });
+
+    return { curves, objects };
   }, [entries, workspace, colorOf]);
 
   const handleAdd = useCallback(
@@ -141,10 +169,11 @@ export function App(): React.JSX.Element {
         const entry = previous.find((candidate) => candidate.id === id);
         const result = previousRef.current.results.get(id);
         if (entry === undefined || result?.kind !== 'value') return previous;
-        const config = normaliseSlider(entry.slider ?? defaultSliderFor(result.value));
+        if (result.literal?.kind !== 'number' || result.name === null) return previous;
+        const config = normaliseSlider(entry.slider ?? defaultSliderFor(result.literal.value));
         const snapped = snapToSlider(value, config);
         return previous.map((candidate) =>
-          candidate.id === id ? withValue(candidate, result.name, snapped, config.step) : candidate,
+          candidate.id === id ? withValue(candidate, result.name!, snapped, config.step) : candidate,
         );
       });
     },
@@ -156,8 +185,24 @@ export function App(): React.JSX.Element {
       const entry = previous.find((candidate) => candidate.id === id);
       const result = previousRef.current.results.get(id);
       if (entry === undefined || result?.kind !== 'value') return previous;
-      const config = normaliseSlider(entry.slider ?? defaultSliderFor(result.value));
+      if (result.literal?.kind !== 'number') return previous;
+      const config = normaliseSlider(entry.slider ?? defaultSliderFor(result.literal.value));
       return updateEntry(previous, id, { slider: { ...config, playing: !config.playing } });
+    });
+  }, []);
+
+  const handlePointDrag = useCallback((id: string, world: Point) => {
+    setEntries((previous) => {
+      const result = previousRef.current.results.get(id);
+      if (result?.kind !== 'value' || result.literal?.kind !== 'point' || result.name === null) {
+        return previous;
+      }
+      const decimals = coordinateDecimals(viewportRef.current);
+      const x = round(world.x, decimals);
+      const y = round(world.y, decimals);
+      return updateEntry(previous, id, {
+        source: `${result.name} = (${formatNumber(x)}, ${formatNumber(y)})`,
+      });
     });
   }, []);
 
@@ -198,7 +243,7 @@ export function App(): React.JSX.Element {
     (result) => result.kind === 'error',
   ).length;
   const values = [...workspace.results.values()].filter(
-    (result) => result.kind === 'value',
+    (result) => result.kind === 'value' && result.value.kind === 'number',
   ).length;
 
   return (
@@ -251,6 +296,7 @@ export function App(): React.JSX.Element {
           initialSpanX={INITIAL_SPAN_X}
           onCursorMove={setCursor}
           onRender={setStats}
+          onPointDrag={handlePointDrag}
         />
 
         <Inspector
@@ -270,7 +316,8 @@ export function App(): React.JSX.Element {
       <StatusBar
         cursor={cursor}
         stats={stats}
-        plotted={scene.curves.length}
+        curves={scene.curves.length}
+        shapes={scene.objects.length}
         values={values}
         problems={problems}
       />
@@ -291,9 +338,10 @@ function advanceAll(
     if (config === null || !config.playing) return entry;
 
     const result = workspace.results.get(entry.id);
-    if (result?.kind !== 'value' || result.literal === null) return entry;
+    if (result?.kind !== 'value' || result.literal?.kind !== 'number') return entry;
+    if (result.name === null) return entry;
 
-    const step = advanceSlider(result.value, config, seconds);
+    const step = advanceSlider(result.literal.value, config, seconds);
     changed = true;
     return withValue(
       { ...entry, slider: { ...config, direction: step.direction } },
@@ -305,6 +353,42 @@ function advanceAll(
 
   // Returning the same array when nothing moved lets React skip the render.
   return changed ? next : entries;
+}
+
+/**
+ * Translates a workspace value into what the renderer draws. The renderer
+ * keeps its own shape types, so this is the only place the two meet.
+ */
+function toSceneObjects(
+  id: string,
+  value: Value,
+  style: { color: string; width: number; label?: string },
+  movable: boolean,
+): SceneObject[] {
+  switch (value.kind) {
+    case 'point':
+      return [{ kind: 'point', id, at: { x: value.x, y: value.y }, movable, style }];
+    case 'line':
+      return [{ kind: 'line', id, form: value.form, from: value.from, to: value.to, style }];
+    case 'circle':
+      return [{ kind: 'circle', id, center: value.center, radius: value.radius, style }];
+    case 'polygon':
+      return [{ kind: 'polygon', id, vertices: value.vertices, style }];
+    case 'number':
+      return [];
+  }
+}
+
+/** Enough decimals to place a point where the pointer actually is. */
+function coordinateDecimals(viewport: Viewport): number {
+  const scale = Math.max(viewport.scale.x, viewport.scale.y);
+  return Math.min(8, Math.max(0, Math.round(Math.log10(Math.max(scale, 1))) + 1));
+}
+
+function round(value: number, decimals: number): number {
+  const factor = Math.pow(10, decimals);
+  const rounded = Math.round(value * factor) / factor;
+  return rounded === 0 ? 0 : rounded;
 }
 
 function readTheme(): ThemeName {

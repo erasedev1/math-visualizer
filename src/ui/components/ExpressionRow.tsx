@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { formatNumber } from '@/core/expression/print';
+import { formatDisplayNumber } from '@/core/expression/print';
 import type { ItemResult } from '@/core/workspace/types';
-import { resultCurve } from '@/core/workspace/types';
+import { resultCurve, resultShape } from '@/core/workspace/types';
 import type { SliderConfig } from '@/core/workspace/slider';
+import { describeValue } from '@/core/values/types';
 import type { ExpressionEntry } from '@/ui/state/entries';
 import { SliderControl } from './SliderControl';
 
@@ -31,7 +32,8 @@ export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
 
-  const drawable = resultCurve(result) !== null;
+  // Curves and geometry are both drawn, so both get a colour and a toggle.
+  const drawable = resultCurve(result) !== null || resultShape(result) !== null;
   const status = statusText(result);
 
   return (
@@ -72,10 +74,10 @@ export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
           }}
         />
 
-        {result.kind === 'value' && slider !== null && (
+        {result.kind === 'value' && result.name !== null && slider !== null && (
           <SliderControl
             name={result.name}
-            value={result.value}
+            value={result.literal?.kind === 'number' ? result.literal.value : 0}
             config={slider}
             onValueChange={props.onSliderValue}
             onTogglePlay={props.onTogglePlay}
@@ -105,8 +107,10 @@ function statusText(result: ItemResult): string | null {
       return result.message;
 
     case 'value':
-      // A draggable value shows its number on the slider itself.
-      return result.literal === null ? `= ${formatNumber(result.value)}` : null;
+      // A value with a slider shows its number on the slider itself.
+      return result.literal?.kind === 'number'
+        ? null
+        : `= ${describeValue(result.value, formatDisplayNumber)}`;
 
     case 'function':
       return result.curve === null

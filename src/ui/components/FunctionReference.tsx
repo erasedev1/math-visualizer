@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { BUILTIN_CONSTANTS, BUILTIN_FUNCTION_LIST } from '@/core/expression/functions';
+import { VALUE_FUNCTION_LIST } from '@/core/values/functions';
 
 /**
  * Lists exactly what the engine can evaluate.
@@ -10,15 +11,20 @@ import { BUILTIN_CONSTANTS, BUILTIN_FUNCTION_LIST } from '@/core/expression/func
 export function FunctionReference(): React.JSX.Element {
   const [query, setQuery] = useState('');
 
-  const functions = useMemo(() => {
+  const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (needle === '') return BUILTIN_FUNCTION_LIST;
-    return BUILTIN_FUNCTION_LIST.filter(
-      (definition) =>
-        definition.name.includes(needle) ||
-        definition.description.toLowerCase().includes(needle),
-    );
+    const filter = <T extends { name: string; description: string }>(list: readonly T[]) =>
+      needle === ''
+        ? list
+        : list.filter(
+            (definition) =>
+              definition.name.includes(needle) ||
+              definition.description.toLowerCase().includes(needle),
+          );
+    return { geometry: filter(VALUE_FUNCTION_LIST), numeric: filter(BUILTIN_FUNCTION_LIST) };
   }, [query]);
+
+  const total = matches.geometry.length + matches.numeric.length;
 
   const constants = useMemo(
     () => Object.keys(BUILTIN_CONSTANTS).filter((name) => /^[a-z]+$/.test(name)),
@@ -31,7 +37,7 @@ export function FunctionReference(): React.JSX.Element {
       <p className="hint">
         Implicit multiplication is supported: <code>2x</code>, <code>3(x+1)</code>,{' '}
         <code>2pi</code>. Angles are in radians. <code>log</code> is base 10,{' '}
-        <code>ln</code> is natural.
+        <code>ln</code> is natural. A point is written <code>(3, 4)</code>.
       </p>
       <p className="hint">
         Constants: <code>{constants.join(', ')}</code>
@@ -43,15 +49,35 @@ export function FunctionReference(): React.JSX.Element {
         aria-label="Search functions"
         onChange={(event) => setQuery(event.target.value)}
       />
-      <ul className="reference-list">
-        {functions.map((definition) => (
-          <li key={definition.name}>
-            <code>{definition.signature}</code>
-            <span>{definition.description}</span>
-          </li>
-        ))}
-      </ul>
-      {functions.length === 0 && <p className="hint">No matching function.</p>}
+      {matches.geometry.length > 0 && (
+        <>
+          <h4 className="reference-heading">Geometry</h4>
+          <ul className="reference-list">
+            {matches.geometry.map((definition) => (
+              <li key={definition.name}>
+                <code>{definition.signature}</code>
+                <span>{definition.description}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {matches.numeric.length > 0 && (
+        <>
+          <h4 className="reference-heading">Numeric</h4>
+          <ul className="reference-list">
+            {matches.numeric.map((definition) => (
+              <li key={definition.name}>
+                <code>{definition.signature}</code>
+                <span>{definition.description}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {total === 0 && <p className="hint">No matching function.</p>}
     </div>
   );
 }

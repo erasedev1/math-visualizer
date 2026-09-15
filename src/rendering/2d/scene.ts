@@ -1,5 +1,6 @@
 import { drawCurve, type CurveStyle } from './curves';
 import { drawGrid } from './grid';
+import { drawObjects, type SceneObject } from './objects';
 import { sampleFunction, type SampleOptions } from './sampler';
 import type { GraphTheme } from './theme';
 import { bounds, toScreenX, toScreenY, type Viewport } from './viewport';
@@ -19,6 +20,7 @@ export interface SceneCurve {
 
 export interface Scene {
   readonly curves: readonly SceneCurve[];
+  readonly objects: readonly SceneObject[];
 }
 
 /** Lower quality is used while the user is panning or zooming. */
@@ -35,6 +37,7 @@ const QUALITY: Record<RenderQuality, Pick<SampleOptions, 'samplesPerPixel' | 'ma
 
 export interface RenderStats {
   readonly curves: number;
+  readonly objects: number;
   readonly evaluations: number;
   readonly milliseconds: number;
 }
@@ -75,8 +78,12 @@ export function renderScene(
     drawCurve(ctx, sampled.segments, curve.style, mapX, mapY);
   }
 
+  // Geometry goes on top, so a point is never buried under a curve.
+  drawObjects(ctx, viewport, scene.objects, theme);
+
   return {
     curves: scene.curves.length,
+    objects: scene.objects.length,
     evaluations,
     milliseconds: performance.now() - started,
   };

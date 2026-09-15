@@ -4,7 +4,8 @@ import type { Point } from '@/rendering/2d/viewport';
 export interface StatusBarProps {
   readonly cursor: Point | null;
   readonly stats: RenderStats | null;
-  readonly plotted: number;
+  readonly curves: number;
+  readonly shapes: number;
   readonly values: number;
   readonly problems: number;
 }
@@ -15,7 +16,7 @@ export interface StatusBarProps {
  * performance regressions visible during development rather than after.
  */
 export function StatusBar(props: StatusBarProps): React.JSX.Element {
-  const { cursor, stats, plotted, values, problems } = props;
+  const { cursor, stats, curves, shapes, values, problems } = props;
 
   return (
     <footer className="status-bar">
@@ -23,7 +24,11 @@ export function StatusBar(props: StatusBarProps): React.JSX.Element {
         {cursor === null ? 'x —, y —' : `x ${format(cursor.x)}, y ${format(cursor.y)}`}
       </span>
       <span className="status-item">
-        {plotted} plotted · {values} {values === 1 ? 'value' : 'values'}
+        {[
+          `${curves} ${curves === 1 ? 'curve' : 'curves'}`,
+          `${shapes} ${shapes === 1 ? 'shape' : 'shapes'}`,
+          `${values} ${values === 1 ? 'value' : 'values'}`,
+        ].join(' · ')}
         {problems > 0 && (
           <span className="status-problem"> · {problems} need attention</span>
         )}
