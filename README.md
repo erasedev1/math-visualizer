@@ -4,9 +4,9 @@ An open-source, local-first mathematical and engineering workspace: a
 programmable canvas where mathematics, visualization and engineering
 calculations live in one environment.
 
-This repository is at **milestone 4**. What is described below as implemented
-is implemented and tested; everything else is on the roadmap and deliberately
-absent from the interface.
+This repository is at **milestone 5, in progress**. What is described below as
+implemented is implemented and tested; everything else is on the roadmap and
+deliberately absent from the interface.
 
 ## Status
 
@@ -52,14 +52,22 @@ absent from the interface.
   toggle beside its grid. For a linear map those columns are where the basis
   vectors land, so `eigenvectors(M)` drawn this way shows the directions the
   map leaves alone. Computed matrices can be drawn as readily as typed ones.
+- Symbolic differentiation, written the way it is written by hand: define
+  `f(x) = sin(x) + x^2/8` and `f'(x)` is its derivative, `f''(x)` the second.
+  The derivative is an expression, not a slope at a point, so it plots, can be
+  evaluated (`f'(2)`), composes (`g(x) = f(x)^2` differentiates through `f`)
+  and can be differentiated again. Built-in functions differentiate by the same
+  mechanism, so `sin'(x)` works too. A step function such as `floor` declares
+  no rule and is refused by name rather than reported as zero.
 - Appearance: per-object colour, line width and visibility; light and dark
   themes.
-- 318 automated tests covering parsing, evaluation, printing, viewport
+- 421 automated tests covering parsing, evaluation, printing, viewport
   transforms, tick selection, sampling, clipping, picking, dependency
-  ordering, reactive propagation, plane geometry, linear algebra and slider
-  behaviour, checked against analytical results.
+  ordering, reactive propagation, plane geometry, linear algebra, slider
+  behaviour and differentiation, checked against analytical results and, for
+  every derivative rule, against a central difference.
 
-**Not built yet** — symbolic calculus, statistics, tables, notebook blocks,
+**Not built yet** — integrals, roots, statistics, tables, notebook blocks,
 units, engineering modules, 3D, the AI tool layer, project files and
 undo/redo. The UI does not contain controls for any of them.
 
@@ -113,6 +121,7 @@ src/
                   algebra, and the functions over them
     workspace/    dependency graph, reactive evaluation, slider behaviour
     plot/         compiles an expression into a drawable curve
+    calculus/     symbolic differentiation, simplification, prime notation
   rendering/
     2d/           viewport transforms, tick selection, adaptive sampler,
                   grid/axis renderer, curve and object renderers, line
@@ -197,6 +206,20 @@ expressions.
   the expression that defines the object. Computed values have nothing to
   write back to, so `M = midpoint(A, B)` cannot be dragged and `inverse(M)`
   is shown as a grid but not edited.
+- **A derivative is a function, not a number.** `f'` is found symbolically, by
+  differentiating the syntax tree, rather than by a difference quotient, which
+  would only give a slope at a point. What comes back is an expression, so it
+  can be plotted, read, and differentiated again.
+- **Every function knows its own derivative.** The rule for `sin` lives in the
+  function registry beside its arity and its numeric implementation, and a
+  function the workspace defines supplies its rule the same way. `core/calculus`
+  knows the chain rule but has never heard of `sin`, so adding `erf` is one
+  line in the registry.
+- **Simplification stops well short of algebra.** Machine-built derivatives are
+  unreadable without it — the power rule alone turns `x^2` into
+  `2 * x^(2 - 1) * 1` — but only identities, constant folding and sign
+  normalisation are done. A half-finished computer algebra system would be
+  worse than an honest `2x`, so `1/3` and `ln(10)` are left as they are.
 - **Refusals over approximations.** A singular matrix has no inverse, a
   rotation has no real eigenvalues, and a system can have no single solution.
   Each says so on the entry that caused it rather than returning a

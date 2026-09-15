@@ -40,6 +40,12 @@ export function FunctionReference(): React.JSX.Element {
         <code>ln</code> is natural. A point is written <code>(3, 4)</code>.
       </p>
       <p className="hint">
+        Write <code>f&#39;(x)</code> for the derivative of a function of one
+        variable, and <code>f&#39;&#39;</code> for the second. It is
+        differentiated symbolically, so it plots, composes and can be
+        differentiated again.
+      </p>
+      <p className="hint">
         Constants: <code>{constants.join(', ')}</code>
       </p>
       <input
@@ -70,7 +76,14 @@ export function FunctionReference(): React.JSX.Element {
             {matches.numeric.map((definition) => (
               <li key={definition.name}>
                 <code>{definition.signature}</code>
-                <span>{definition.description}</span>
+                <span>
+                  {definition.description}
+                  {/* Read from the registry, so the list cannot claim a
+                      derivative exists where no rule is declared. */}
+                  {definition.derivative === undefined && (
+                    <em className="reference-note"> · no derivative</em>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
