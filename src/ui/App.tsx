@@ -25,9 +25,12 @@ import { StatusBar } from './components/StatusBar';
 import {
   createEntry,
   insertEntryAfter,
+  matrixSource,
   nextColorIndex,
   removeEntry,
   updateEntry,
+  vectorSource,
+  withBody,
   withValue,
   type ExpressionEntry,
 } from './state/entries';
@@ -38,8 +41,9 @@ const INITIAL_SOURCES = [
   'A = (-4, -2)',
   'B = (5, 3)',
   's = segment(A, B)',
-  'M = midpoint(A, B)',
-  'c = circle(M, A)',
+  'v = <3, 4>',
+  'M = [[1, 2], [3, 4]]',
+  'd = det(M)',
 ];
 
 function initialEntries(): ExpressionEntry[] {
@@ -115,7 +119,9 @@ export function App(): React.JSX.Element {
         width: entry.lineWidth,
         ...(result.name === null ? {} : { label: result.name }),
       };
-      return toSceneObjects(entry.id, shape, style, result.literal?.kind === 'point');
+      const movable =
+        result.literal?.kind === 'point' || result.literal?.kind === 'vector';
+      return toSceneObjects(entry.id, shape, style, movable);
     });
 
     return { curves, objects };
@@ -191,18 +197,47 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
-  const handlePointDrag = useCallback((id: string, world: Point) => {
+  /** Dragging a point moves it; dragging an arrow's tip changes the vector. */
+  const handleObjectDrag = useCallback((id: string, world: Point) => {
     setEntries((previous) => {
+      const entry = previous.find((candidate) => candidate.id === id);
       const result = previousRef.current.results.get(id);
-      if (result?.kind !== 'value' || result.literal?.kind !== 'point' || result.name === null) {
-        return previous;
-      }
+      if (entry === undefined || result?.kind !== 'value' || result.name === null) return previous;
+
       const decimals = coordinateDecimals(viewportRef.current);
       const x = round(world.x, decimals);
       const y = round(world.y, decimals);
-      return updateEntry(previous, id, {
-        source: `${result.name} = (${formatNumber(x)}, ${formatNumber(y)})`,
-      });
+
+      if (result.literal?.kind === 'point') {
+        return updateEntry(previous, id, {
+          source: `${result.name} = (${formatNumber(x)}, ${formatNumber(y)})`,
+        });
+      }
+
+      if (result.literal?.kind === 'vector' && result.value.kind === 'vector') {
+        // The tip follows the pointer, so the components are measured from
+        // wherever the arrow is anchored.
+        const { anchor } = result.value;
+        const body = vectorSource([round(x - anchor.x, decimals), round(y - anchor.y, decimals)]);
+        return previous.map((candidate) =>
+          candidate.id === id ? withBody(candidate, result.name!, body) : candidate,
+        );
+      }
+
+      return previous;
+    });
+  }, []);
+
+  /** Editing a cell rewrites the matrix literal it came from. */
+  const handleMatrixChange = useCallback((id: string, rows: readonly (readonly number[])[]) => {
+    setEntries((previous) => {
+      const result = previousRef.current.results.get(id);
+      if (result?.kind !== 'value' || result.literal?.kind !== 'matrix' || result.name === null) {
+        return previous;
+      }
+      return previous.map((candidate) =>
+        candidate.id === id ? withBody(candidate, result.name!, matrixSource(rows)) : candidate,
+      );
     });
   }, []);
 
@@ -286,6 +321,7 @@ export function App(): React.JSX.Element {
           onAdd={handleAdd}
           onSliderValue={handleSliderValue}
           onTogglePlay={handleTogglePlay}
+          onMatrixChange={handleMatrixChange}
         />
 
         <GraphCanvas
@@ -296,7 +332,7 @@ export function App(): React.JSX.Element {
           initialSpanX={INITIAL_SPAN_X}
           onCursorMove={setCursor}
           onRender={setStats}
-          onPointDrag={handlePointDrag}
+          onPointDrag={handleObjectDrag}
         />
 
         <Inspector
@@ -368,6 +404,21 @@ function toSceneObjects(
   switch (value.kind) {
     case 'point':
       return [{ kind: 'point', id, at: { x: value.x, y: value.y }, movable, style }];
+    case 'vector': {
+      const [dx = 0, dy = 0] = value.components;
+      // Only plane vectors have somewhere to be drawn.
+      if (value.components.length !== 2) return [];
+      return [
+        {
+          kind: 'vector',
+          id,
+          anchor: value.anchor,
+          tip: { x: value.anchor.x + dx, y: value.anchor.y + dy },
+          movable,
+          style,
+        },
+      ];
+    }
     case 'line':
       return [{ kind: 'line', id, form: value.form, from: value.from, to: value.to, style }];
     case 'circle':
@@ -375,6 +426,7 @@ function toSceneObjects(
     case 'polygon':
       return [{ kind: 'polygon', id, vertices: value.vertices, style }];
     case 'number':
+    case 'matrix':
       return [];
   }
 }

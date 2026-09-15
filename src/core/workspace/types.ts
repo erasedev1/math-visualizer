@@ -43,7 +43,9 @@ export interface ValueResult extends ResultBase {
 /** A definition whose body is a bare literal, and so can be edited directly. */
 export type LiteralForm =
   | { readonly kind: 'number'; readonly value: number }
-  | { readonly kind: 'point'; readonly x: number; readonly y: number };
+  | { readonly kind: 'point'; readonly x: number; readonly y: number }
+  | { readonly kind: 'vector'; readonly components: readonly number[] }
+  | { readonly kind: 'matrix'; readonly rows: readonly (readonly number[])[] };
 
 /** A named function, such as `f(x) = a x^2`. */
 export interface FunctionResult extends ResultBase {

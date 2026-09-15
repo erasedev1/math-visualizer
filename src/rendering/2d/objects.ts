@@ -47,7 +47,28 @@ export interface ScenePolygon extends SceneObjectBase {
   readonly vertices: readonly Point[];
 }
 
-export type SceneObject = ScenePoint | SceneLine | SceneCircle | ScenePolygon;
+export interface SceneVector extends SceneObjectBase {
+  readonly kind: 'vector';
+  /** Where the arrow starts. */
+  readonly anchor: Point;
+  /** Where it ends. */
+  readonly tip: Point;
+  readonly movable: boolean;
+}
+
+export type SceneObject =
+  | ScenePoint
+  | SceneVector
+  | SceneLine
+  | SceneCircle
+  | ScenePolygon;
+
+/** The position a drag handle sits at, for objects that have one. */
+export function handleOf(object: SceneObject): Point | null {
+  if (object.kind === 'point') return object.movable ? object.at : null;
+  if (object.kind === 'vector') return object.movable ? object.tip : null;
+  return null;
+}
 
 /** Radius of a plotted point, in CSS pixels. */
 export const POINT_RADIUS = 4.5;
@@ -68,11 +89,79 @@ export function drawObjects(
   // Shapes first, then points, so a vertex is never hidden under an edge.
   for (const object of objects) {
     if (object.kind === 'point') continue;
-    drawShape(ctx, object, view, x, y);
+    if (object.kind === 'vector') drawVector(ctx, object, theme, x, y);
+    else drawShape(ctx, object, view, x, y);
   }
   for (const object of objects) {
     if (object.kind === 'point') drawPoint(ctx, object, theme, x, y);
   }
+}
+
+/** Length of an arrowhead, in CSS pixels. */
+const ARROW_HEAD = 11;
+const ARROW_SPREAD = 0.42;
+
+function drawVector(
+  ctx: CanvasRenderingContext2D,
+  object: SceneVector,
+  theme: GraphTheme,
+  x: (value: number) => number,
+  y: (value: number) => number,
+): void {
+  const fromX = x(object.anchor.x);
+  const fromY = y(object.anchor.y);
+  const toX = x(object.tip.x);
+  const toY = y(object.tip.y);
+  if (![fromX, fromY, toX, toY].every(Number.isFinite)) return;
+
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+  const length = Math.hypot(toX - fromX, toY - fromY);
+  if (length < 0.5) return;
+
+  // The shaft stops short of the tip so the head comes to a clean point.
+  const head = Math.min(ARROW_HEAD, length * 0.5);
+  const shaftX = toX - Math.cos(angle) * head * 0.85;
+  const shaftY = toY - Math.sin(angle) * head * 0.85;
+
+  ctx.save();
+  ctx.strokeStyle = object.style.color;
+  ctx.fillStyle = object.style.color;
+  ctx.lineWidth = object.style.width;
+  ctx.lineCap = 'round';
+
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(shaftX, shaftY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(toX, toY);
+  ctx.lineTo(toX - Math.cos(angle - ARROW_SPREAD) * head, toY - Math.sin(angle - ARROW_SPREAD) * head);
+  ctx.lineTo(toX - Math.cos(angle + ARROW_SPREAD) * head, toY - Math.sin(angle + ARROW_SPREAD) * head);
+  ctx.closePath();
+  ctx.fill();
+
+  if (object.movable) {
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(toX, toY, ARROW_HEAD, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  const { label } = object.style;
+  if (label !== undefined && label !== '') {
+    ctx.font = LABEL_FONT;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = theme.labelHalo;
+    ctx.strokeText(label, toX + LABEL_OFFSET, toY - LABEL_OFFSET + 4);
+    ctx.fillText(label, toX + LABEL_OFFSET, toY - LABEL_OFFSET + 4);
+  }
+
+  ctx.restore();
 }
 
 function drawShape(

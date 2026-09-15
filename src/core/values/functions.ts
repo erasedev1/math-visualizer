@@ -11,18 +11,23 @@ import {
   polygonPerimeter,
   withinForm,
 } from './geometry';
+import * as linear from './matrix';
 import {
   circle,
   describeKind,
   line,
+  matrix,
   number,
   point,
   polygon,
+  vector,
   withArticle,
   type LineValue,
+  type MatrixValue,
   type Point,
   type Value,
   type ValueKind,
+  type VectorValue,
 } from './types';
 
 /**
@@ -80,6 +85,59 @@ function expectLine(args: readonly Value[], index: number, name: string): LineVa
     );
   }
   return argument;
+}
+
+function expectVector(args: readonly Value[], index: number, name: string): VectorValue {
+  const argument = args[index];
+  if (argument === undefined || argument.kind !== 'vector') {
+    throw new ExpressionError(
+      `${name} expects a vector as argument ${index + 1}, but got ${
+        argument === undefined ? 'nothing' : withArticle(argument.kind)
+      }`,
+    );
+  }
+  return argument;
+}
+
+function expectMatrix(args: readonly Value[], index: number, name: string): MatrixValue {
+  const argument = args[index];
+  if (argument === undefined || argument.kind !== 'matrix') {
+    throw new ExpressionError(
+      `${name} expects a matrix as argument ${index + 1}, but got ${
+        argument === undefined ? 'nothing' : withArticle(argument.kind)
+      }`,
+    );
+  }
+  return argument;
+}
+
+function expectSquare(args: readonly Value[], index: number, name: string): MatrixValue {
+  const value = expectMatrix(args, index, name);
+  if (!linear.isSquare(value.rows)) {
+    const { rows, columns } = linear.dimensions(value.rows);
+    throw new ExpressionError(`${name} needs a square matrix, but this one is ${rows}\u00d7${columns}`);
+  }
+  return value;
+}
+
+/** Vectors of matching length, for the products that need one. */
+function expectPair(args: readonly Value[], name: string): [VectorValue, VectorValue] {
+  const first = expectVector(args, 0, name);
+  const second = expectVector(args, 1, name);
+  if (first.components.length !== second.components.length) {
+    throw new ExpressionError(
+      `${name} needs vectors of the same length, but these have ${first.components.length} and ${second.components.length} components`,
+    );
+  }
+  return [first, second];
+}
+
+function dotProduct(a: VectorValue, b: VectorValue): number {
+  return a.components.reduce((total, component, i) => total + component * b.components[i]!, 0);
+}
+
+function magnitudeOf(value: VectorValue): number {
+  return Math.hypot(...value.components);
 }
 
 function define(
@@ -187,18 +245,166 @@ const DEFINITIONS: readonly ValueFunction[] = [
 
   define(
     'angle',
-    'angle(A, B, C)',
-    'The angle at B, in radians, between BA and BC',
+    'angle(A, B, C) or angle(v, w)',
+    'The angle at B between BA and BC, or between two vectors',
+    2,
     3,
-    3,
-    (args) =>
-      number(
+    (args) => {
+      if (args.length === 2) {
+        const [a, b] = expectPair(args, 'angle');
+        const lengths = magnitudeOf(a) * magnitudeOf(b);
+        if (lengths === 0) {
+          throw new ExpressionError('A zero vector has no direction, so there is no angle');
+        }
+        // Clamped because rounding can push the ratio just outside [-1, 1].
+        return number(Math.acos(Math.min(1, Math.max(-1, dotProduct(a, b) / lengths))));
+      }
+      return number(
         angleAt(
           expectPoint(args, 1, 'angle'),
           expectPoint(args, 0, 'angle'),
           expectPoint(args, 2, 'angle'),
         ),
-      ),
+      );
+    },
+  ),
+
+  // Vectors.
+  define(
+    'vector',
+    'vector(x, y, ...) or vector(A, B)',
+    'A vector from its components, or the arrow from A to B',
+    2,
+    Infinity,
+    (args) => {
+      const [first, second] = args;
+      if (first?.kind === 'point' && second?.kind === 'point' && args.length === 2) {
+        return vector([second.x - first.x, second.y - first.y], first);
+      }
+      return vector(args.map((_, index) => expectNumber(args, index, 'vector')));
+    },
+  ),
+
+  define('magnitude', 'magnitude(v)', 'Length of a vector', 1, 1, (args) =>
+    number(magnitudeOf(expectVector(args, 0, 'magnitude'))),
+  ),
+
+  define('normalize', 'normalize(v)', 'The unit vector in the same direction', 1, 1, (args) => {
+    const value = expectVector(args, 0, 'normalize');
+    const length = magnitudeOf(value);
+    if (length === 0) throw new ExpressionError('A zero vector has no direction to normalize');
+    return vector(value.components.map((component) => component / length), value.anchor);
+  }),
+
+  define('dot', 'dot(v, w)', 'Dot product of two vectors', 2, 2, (args) =>
+    number(dotProduct(...expectPair(args, 'dot'))),
+  ),
+
+  define(
+    'cross',
+    'cross(v, w)',
+    'Cross product: a vector in 3D, a number in 2D',
+    2,
+    2,
+    (args) => {
+      const [a, b] = expectPair(args, 'cross');
+      if (a.components.length === 2) {
+        return number(a.components[0]! * b.components[1]! - a.components[1]! * b.components[0]!);
+      }
+      if (a.components.length === 3) {
+        const [ax, ay, az] = a.components as [number, number, number];
+        const [bx, by, bz] = b.components as [number, number, number];
+        return vector([ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx]);
+      }
+      throw new ExpressionError('cross needs vectors with 2 or 3 components');
+    },
+  ),
+
+  define(
+    'projection',
+    'projection(v, onto)',
+    'The part of v that lies along another vector',
+    2,
+    2,
+    (args) => {
+      const [value, onto] = expectPair(args, 'projection');
+      const lengthSquared = dotProduct(onto, onto);
+      if (lengthSquared === 0) {
+        throw new ExpressionError('Cannot project onto a zero vector');
+      }
+      const factor = dotProduct(value, onto) / lengthSquared;
+      return vector(onto.components.map((component) => component * factor), onto.anchor);
+    },
+  ),
+
+  // Matrices.
+  define('identity', 'identity(n)', 'The n by n identity matrix', 1, 1, (args) => {
+    const size = Math.round(expectNumber(args, 0, 'identity'));
+    if (!Number.isFinite(size) || size < 1 || size > 64) {
+      throw new ExpressionError('identity needs a whole number of rows between 1 and 64');
+    }
+    return matrix(linear.identity(size));
+  }),
+
+  define('transpose', 'transpose(M)', 'The matrix with rows and columns swapped', 1, 1, (args) =>
+    matrix(linear.transpose(expectMatrix(args, 0, 'transpose').rows)),
+  ),
+
+  define('det', 'det(M)', 'Determinant of a square matrix', 1, 1, (args) =>
+    number(linear.determinant(expectSquare(args, 0, 'det').rows)),
+  ),
+
+  define('rank', 'rank(M)', 'Number of independent rows', 1, 1, (args) =>
+    number(linear.rank(expectMatrix(args, 0, 'rank').rows)),
+  ),
+
+  define('inverse', 'inverse(M)', 'The inverse of a square matrix', 1, 1, (args) => {
+    const result = linear.inverse(expectSquare(args, 0, 'inverse').rows);
+    if (result === null) {
+      throw new ExpressionError('This matrix is singular, so it has no inverse');
+    }
+    return matrix(result);
+  }),
+
+  define(
+    'solve',
+    'solve(M, b)',
+    'Solves the linear system M x = b',
+    2,
+    2,
+    (args) => {
+      const system = expectSquare(args, 0, 'solve');
+      const target = expectVector(args, 1, 'solve');
+      const { rows } = linear.dimensions(system.rows);
+      if (rows !== target.components.length) {
+        throw new ExpressionError(
+          `solve needs a vector with ${rows} components to match a ${rows}\u00d7${rows} matrix`,
+        );
+      }
+      const solution = linear.solve(system.rows, target.components);
+      if (solution === null) {
+        throw new ExpressionError('This system has no single solution');
+      }
+      return vector(solution);
+    },
+  ),
+
+  define(
+    'eigenvalues',
+    'eigenvalues(M)',
+    'Real eigenvalues, largest first, as one row',
+    1,
+    1,
+    (args) => matrix([eigenOf(args, 'eigenvalues').values]),
+  ),
+
+  define(
+    'eigenvectors',
+    'eigenvectors(M)',
+    'Eigenvectors as the columns of a matrix',
+    1,
+    1,
+    (args) => matrix(linear.transpose(eigenOf(args, 'eigenvectors').vectors)),
   ),
 
   define('area', 'area(shape)', 'Area of a polygon or circle', 1, 1, (args) => {
@@ -226,6 +432,20 @@ const DEFINITIONS: readonly ValueFunction[] = [
     );
   }),
 ];
+
+/** Shared by eigenvalues and eigenvectors, including the honest refusal. */
+function eigenOf(args: readonly Value[], name: string): linear.Eigen {
+  const value = expectSquare(args, 0, name);
+  const result = linear.eigen(value.rows);
+  if (result === null) {
+    throw new ExpressionError(
+      linear.dimensions(value.rows).rows > 2
+        ? `${name} handles symmetric matrices of any size and any 2\u00d72 matrix; this one is neither`
+        : 'This matrix has no real eigenvalues',
+    );
+  }
+  return result;
+}
 
 export const VALUE_FUNCTIONS: ValueFunctionRegistry = new Map(
   DEFINITIONS.map((definition) => [definition.name, definition]),

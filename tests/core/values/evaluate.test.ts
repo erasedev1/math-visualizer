@@ -53,12 +53,15 @@ describe('evaluateValue', () => {
     expect(() => evaluate('((1, 2), 3)')).toThrow(/Expected a number/);
   });
 
-  it('adds, subtracts and scales points', () => {
+  it('adds and scales points, and subtracts them into a displacement', () => {
     expect(expectPoint('A + B', { A, B })).toEqual(point(4, 2));
-    expect(expectPoint('B - A', { A, B })).toEqual(point(4, 2));
     expect(expectPoint('2 B', { B })).toEqual(point(8, 4));
     expect(expectPoint('B / 2', { B })).toEqual(point(2, 1));
     expect(expectPoint('-B', { B })).toEqual(point(-4, -2));
+
+    // The difference of two points is the vector between them, not a point.
+    const difference = evaluate('B - A', { A, B });
+    expect(difference.kind).toBe('vector');
   });
 
   it('lets a midpoint be written as arithmetic or as a function', () => {
@@ -72,6 +75,7 @@ describe('evaluateValue', () => {
     expect(() => evaluate('A ^ 2', { A })).toThrow(/raise a point and a number/);
     expect(() => evaluate('2 / A', { A })).toThrow(/divide a number and a point/);
     expect(() => evaluate('A + 1', { A })).toThrow(/add a point and a number/);
+    expect(() => evaluate('A + <1, 2, 3>', { A })).toThrow(/add a point and a vector/);
   });
 
   it('builds the geometric constructions', () => {

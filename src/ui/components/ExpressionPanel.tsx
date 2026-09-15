@@ -17,6 +17,7 @@ export interface ExpressionPanelProps {
   readonly onAdd: (afterId: string | null) => void;
   readonly onSliderValue: (id: string, value: number) => void;
   readonly onTogglePlay: (id: string) => void;
+  readonly onMatrixChange: (id: string, rows: readonly (readonly number[])[]) => void;
 }
 
 const EMPTY_RESULT: ItemResult = { kind: 'empty', id: '', dependencies: [] };
@@ -50,6 +51,7 @@ export function ExpressionPanel(props: ExpressionPanelProps): React.JSX.Element 
             onEnter={() => props.onAdd(entry.id)}
             onSliderValue={(value) => props.onSliderValue(entry.id, value)}
             onTogglePlay={() => props.onTogglePlay(entry.id)}
+            onMatrixChange={(rows) => props.onMatrixChange(entry.id, rows)}
           />
         ))}
       </ul>

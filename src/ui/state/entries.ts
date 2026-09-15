@@ -1,3 +1,4 @@
+import { formatNumber } from '@/core/expression/print';
 import { formatSliderValue, type SliderConfig } from '@/core/workspace/slider';
 
 /**
@@ -78,4 +79,22 @@ export function removeEntry(
  */
 export function withValue(entry: ExpressionEntry, name: string, value: number, step: number): ExpressionEntry {
   return { ...entry, source: `${name} = ${formatSliderValue(value, step)}` };
+}
+
+/** Rewrites a definition's right-hand side with arbitrary source text. */
+export function withBody(entry: ExpressionEntry, name: string, body: string): ExpressionEntry {
+  return { ...entry, source: `${name} = ${body}` };
+}
+
+/** The source text for a matrix literal, one bracketed list per row. */
+export function matrixSource(rows: readonly (readonly number[])[]): string {
+  const row = (entries: readonly number[]) =>
+    `[${entries.map((entry) => formatNumber(entry)).join(', ')}]`;
+  if (rows.length === 1) return row(rows[0]!);
+  return `[${rows.map(row).join(', ')}]`;
+}
+
+/** The source text for a vector literal. */
+export function vectorSource(components: readonly number[]): string {
+  return `<${components.map((component) => formatNumber(component)).join(', ')}>`;
 }

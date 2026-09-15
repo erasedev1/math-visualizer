@@ -109,6 +109,12 @@ function compileNode(
         `A ${node.elements.length === 2 ? 'point' : 'list'} cannot be used where a number is expected`,
       );
 
+    case 'Vector':
+      throw new ExpressionError('A vector cannot be used where a number is expected');
+
+    case 'List':
+      throw new ExpressionError('A matrix cannot be used where a number is expected');
+
     case 'Call': {
       const definition = functions.get(node.callee);
       if (definition === undefined) {

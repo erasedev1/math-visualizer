@@ -5,6 +5,7 @@ import { resultCurve, resultShape } from '@/core/workspace/types';
 import type { SliderConfig } from '@/core/workspace/slider';
 import { describeValue } from '@/core/values/types';
 import type { ExpressionEntry } from '@/ui/state/entries';
+import { MatrixEditor } from './MatrixEditor';
 import { SliderControl } from './SliderControl';
 
 export interface ExpressionRowProps {
@@ -22,6 +23,7 @@ export interface ExpressionRowProps {
   readonly onEnter: () => void;
   readonly onSliderValue: (value: number) => void;
   readonly onTogglePlay: () => void;
+  readonly onMatrixChange: (rows: readonly (readonly number[])[]) => void;
 }
 
 export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
@@ -84,6 +86,14 @@ export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
           />
         )}
 
+        {result.kind === 'value' && result.value.kind === 'matrix' && (
+          <MatrixEditor
+            rows={result.value.rows}
+            editable={result.literal?.kind === 'matrix'}
+            onChange={props.onMatrixChange}
+          />
+        )}
+
         {status !== null && <p className="expression-status">{status}</p>}
       </div>
 
@@ -107,10 +117,9 @@ function statusText(result: ItemResult): string | null {
       return result.message;
 
     case 'value':
-      // A value with a slider shows its number on the slider itself.
-      return result.literal?.kind === 'number'
-        ? null
-        : `= ${describeValue(result.value, formatDisplayNumber)}`;
+      // Sliders and matrix grids already show their own contents.
+      if (result.literal?.kind === 'number' || result.value.kind === 'matrix') return null;
+      return `= ${describeValue(result.value, formatDisplayNumber)}`;
 
     case 'function':
       return result.curve === null

@@ -6,6 +6,10 @@ export type TokenType =
   | 'operator'
   | 'lparen'
   | 'rparen'
+  | 'lbracket'
+  | 'rbracket'
+  | 'langle'
+  | 'rangle'
   | 'comma'
   | 'eof';
 
@@ -23,6 +27,13 @@ const IDENT_START = /[A-Za-z_Α-ω]/;
 const IDENT_PART = /[A-Za-z0-9_Α-ω]/;
 const DIGIT = /[0-9]/;
 const WHITESPACE = /\s/;
+
+const DELIMITERS: Readonly<Record<string, TokenType | undefined>> = {
+  '[': 'lbracket',
+  ']': 'rbracket',
+  '<': 'langle',
+  '>': 'rangle',
+};
 
 /** Multi-character operators must be listed before their prefixes. */
 const OPERATORS = ['**', '+', '-', '*', '/', '^', '='] as const;
@@ -106,6 +117,15 @@ export function tokenize(source: string): Token[] {
 
     if (ch === ',') {
       tokens.push({ type: 'comma', value: ch, start: i, end: i + 1 });
+      i += 1;
+      continue;
+    }
+
+    // Brackets delimit matrices, angles delimit vectors. Neither doubles as a
+    // comparison operator, which the language does not have.
+    const delimiter = DELIMITERS[ch];
+    if (delimiter !== undefined) {
+      tokens.push({ type: delimiter, value: ch, start: i, end: i + 1 });
       i += 1;
       continue;
     }

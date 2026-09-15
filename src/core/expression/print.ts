@@ -46,6 +46,12 @@ function print(node: Expr): string {
     case 'Tuple':
       return `(${node.elements.map(print).join(', ')})`;
 
+    case 'Vector':
+      return `<${node.elements.map(print).join(', ')}>`;
+
+    case 'List':
+      return `[${node.elements.map(print).join(', ')}]`;
+
     case 'Unary':
       return `${node.operator}${operand(node.argument, UNARY_PRECEDENCE, false, 'right')}`;
 
@@ -89,6 +95,8 @@ function precedenceOf(node: Expr): number {
     case 'Identifier':
     case 'Call':
     case 'Tuple':
+    case 'Vector':
+    case 'List':
       return ATOM_PRECEDENCE;
   }
 }

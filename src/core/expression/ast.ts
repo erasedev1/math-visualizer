@@ -40,6 +40,18 @@ export interface TupleNode {
   readonly elements: readonly Expr[];
 }
 
+/** `<3, 4>`: a vector. */
+export interface VectorNode {
+  readonly type: 'Vector';
+  readonly elements: readonly Expr[];
+}
+
+/** `[1, 2]` or `[[1, 2], [3, 4]]`: a matrix, written as its rows. */
+export interface ListNode {
+  readonly type: 'List';
+  readonly elements: readonly Expr[];
+}
+
 export interface CallNode {
   readonly type: 'Call';
   readonly callee: string;
@@ -53,7 +65,9 @@ export type Expr =
   | UnaryNode
   | BinaryNode
   | CallNode
-  | TupleNode;
+  | TupleNode
+  | VectorNode
+  | ListNode;
 
 /** `lhs = rhs`. Only valid at the top level of a source string. */
 export interface EqualityNode {
@@ -87,6 +101,16 @@ export const tuple = (elements: readonly Expr[]): TupleNode => ({
   elements,
 });
 
+export const vector = (elements: readonly Expr[]): VectorNode => ({
+  type: 'Vector',
+  elements,
+});
+
+export const list = (elements: readonly Expr[]): ListNode => ({
+  type: 'List',
+  elements,
+});
+
 export const call = (callee: string, args: readonly Expr[]): CallNode => ({
   type: 'Call',
   callee,
@@ -117,6 +141,8 @@ export function children(node: Root): readonly Expr[] {
     case 'Call':
       return node.args;
     case 'Tuple':
+    case 'Vector':
+    case 'List':
       return node.elements;
   }
 }

@@ -510,7 +510,40 @@ function literalForm(body: Expr): LiteralForm | null {
     if (x !== null && y !== null) return { kind: 'point', x, y };
   }
 
+  if (body.type === 'Vector') {
+    const components = literalNumbers(body.elements);
+    if (components !== null) return { kind: 'vector', components };
+  }
+
+  if (body.type === 'List' && body.elements.length > 0) {
+    const flat = literalNumbers(body.elements);
+    if (flat !== null) return { kind: 'matrix', rows: [flat] };
+
+    const rows: number[][] = [];
+    for (const element of body.elements) {
+      if (element.type !== 'List') return null;
+      const row = literalNumbers(element.elements);
+      if (row === null || row.length === 0) return null;
+      rows.push(row);
+    }
+    const width = rows[0]?.length ?? 0;
+    if (width > 0 && rows.every((row) => row.length === width)) {
+      return { kind: 'matrix', rows };
+    }
+  }
+
   return null;
+}
+
+/** All-or-nothing: every element must itself be a plain number. */
+function literalNumbers(elements: readonly Expr[]): number[] | null {
+  const numbers: number[] = [];
+  for (const element of elements) {
+    const value = literalNumber(element);
+    if (value === null) return null;
+    numbers.push(value);
+  }
+  return numbers;
 }
 
 /** The number written in the source, when the expression is nothing but one. */

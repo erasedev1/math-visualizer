@@ -4,7 +4,7 @@ An open-source, local-first mathematical and engineering workspace: a
 programmable canvas where mathematics, visualization and engineering
 calculations live in one environment.
 
-This repository is at **milestone 3**. What is described below as implemented
+This repository is at **milestone 4**. What is described below as implemented
 is implemented and tested; everything else is on the roadmap and deliberately
 absent from the interface.
 
@@ -39,22 +39,33 @@ absent from the interface.
 - Point arithmetic: `(A + B)/2` means the same as `midpoint(A, B)`, and
   anything without a meaning (`A * B`, `A + 1`) is a type error naming both
   kinds rather than a silent NaN.
+- Vectors, written `v = <3, 4>`, drawn as arrows and draggable by the tip:
+  `magnitude`, `normalize`, `dot`, `cross` (a vector in 3D, a number in 2D),
+  `projection`, and `angle` between two of them. `B - A` is the displacement
+  from A to B, and `A + v` moves a point.
+- Matrices, written `M = [[1, 2], [3, 4]]`, with an editable grid instead of a
+  wall of brackets: add and remove rows and columns, type into a cell, and
+  everything downstream recomputes. `transpose`, `det`, `rank`, `inverse`,
+  `solve`, `identity`, `eigenvalues` and `eigenvectors`, plus the products
+  between matrices, vectors and numbers.
 - Appearance: per-object colour, line width and visibility; light and dark
   themes.
-- 252 automated tests covering parsing, evaluation, printing, viewport
+- 318 automated tests covering parsing, evaluation, printing, viewport
   transforms, tick selection, sampling, clipping, picking, dependency
-  ordering, reactive propagation, plane geometry and slider behaviour, checked
-  against analytical results.
+  ordering, reactive propagation, plane geometry, linear algebra and slider
+  behaviour, checked against analytical results.
 
-**Not built yet** — vectors, matrices, symbolic calculus, statistics, tables,
-notebook blocks, units, engineering modules, 3D, the AI tool layer, project
-files and undo/redo. The UI does not contain controls for any of them.
+**Not built yet** — symbolic calculus, statistics, tables, notebook blocks,
+units, engineering modules, 3D, the AI tool layer, project files and
+undo/redo. The UI does not contain controls for any of them.
 
 **Known limits at this milestone** — a curve is compiled on the unboxed
-numeric path, so a function cannot yet read a point (`f(x) = distance(A, (x, 0))`
-reports this rather than failing obscurely). Intersections are between lines,
-rays and segments; circle intersections need a value that can hold two points,
-which arrives with vectors.
+numeric path, so a function cannot yet read a point, a vector or a matrix
+(`f(x) = distance(A, (x, 0))` reports this rather than failing obscurely).
+Intersections are between lines, rays and segments. `eigenvalues` covers
+symmetric matrices of any size and any 2x2; anything else, including complex
+eigenvalues, is refused rather than approximated. Only plane vectors are
+drawn, though longer ones compute normally.
 
 ## Running it
 
@@ -78,8 +89,9 @@ src/
   core/
     expression/   tokenizer, parser, AST, closure compiler, printer,
                   definition parser, function/constant registry
-    values/       the value domain: numbers, points, lines, circles,
-                  polygons, plane geometry, and the geometry functions
+    values/       the value domain: numbers, points, vectors, matrices,
+                  lines, circles, polygons, plane geometry, dense linear
+                  algebra, and the functions over them
     workspace/    dependency graph, reactive evaluation, slider behaviour
     plot/         compiles an expression into a drawable curve
   rendering/
@@ -161,6 +173,15 @@ expressions.
 - **The renderer keeps its own shape types.** It never imports the value
   union, so drawing stays independent of how values are modelled; one function
   in the UI translates between them.
+- **Everything editable is a literal.** A slider, a dragged point, a dragged
+  arrow tip and a matrix cell all do the same thing: rewrite the literal in
+  the expression that defines the object. Computed values have nothing to
+  write back to, so `M = midpoint(A, B)` cannot be dragged and `inverse(M)`
+  is shown as a grid but not edited.
+- **Refusals over approximations.** A singular matrix has no inverse, a
+  rotation has no real eigenvalues, and a system can have no single solution.
+  Each says so on the entry that caused it rather than returning a
+  plausible-looking number.
 
 ## Roadmap
 
@@ -169,7 +190,7 @@ expressions.
 | 1 ✅ | app shell, canvas, expression parser, function plotting, pan/zoom |
 | 2 ✅ | reactive dependency graph, variables, sliders |
 | 3 ✅ | points, lines, circles, geometric relationships |
-| 4 | vectors, matrices, a matrix editor |
+| 4 ✅ | vectors, matrices, a matrix editor |
 | 5 | calculus, numerical methods, statistics |
 | 6 | notebook/document blocks |
 | 7 | units and dimensional analysis, engineering modules |

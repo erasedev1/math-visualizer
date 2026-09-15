@@ -3,8 +3,10 @@ import {
   call,
   equality,
   id,
+  list,
   num,
   tuple,
+  vector,
   unary,
   type Expr,
   type Root,
@@ -140,7 +142,13 @@ class Parser {
   /** True when the current token could begin a primary expression. */
   private startsPrimary(): boolean {
     const token = this.peek();
-    return token.type === 'number' || token.type === 'identifier' || token.type === 'lparen';
+    return (
+      token.type === 'number' ||
+      token.type === 'identifier' ||
+      token.type === 'lparen' ||
+      token.type === 'lbracket' ||
+      token.type === 'langle'
+    );
   }
 
   private parseUnary(): Expr {
@@ -190,6 +198,20 @@ class Parser {
         return elements.length === 1 ? elements[0]! : tuple(elements);
       }
 
+      case 'langle': {
+        this.next();
+        const elements = this.parseElements('rangle', '">"');
+        if (elements.length === 0) {
+          throw new ExpressionError('A vector needs at least one component', token.start, token.end);
+        }
+        return vector(elements);
+      }
+
+      case 'lbracket': {
+        this.next();
+        return list(this.parseElements('rbracket', '"]"'));
+      }
+
       case 'operator':
         throw new ExpressionError(
           `Expected a value but found "${token.value}"`,
@@ -204,6 +226,20 @@ class Parser {
           token.end,
         );
     }
+  }
+
+  /** Comma-separated expressions up to a closing delimiter. */
+  private parseElements(closing: Token['type'], description: string): Expr[] {
+    const elements: Expr[] = [];
+    if (this.peek().type !== closing) {
+      elements.push(this.parseExpression());
+      while (this.peek().type === 'comma') {
+        this.next();
+        elements.push(this.parseExpression());
+      }
+    }
+    this.expect(closing, description);
+    return elements;
   }
 
   private parseCallArguments(name: Token): Expr {

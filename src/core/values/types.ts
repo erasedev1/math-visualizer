@@ -41,6 +41,21 @@ export interface CircleValue {
   readonly radius: number;
 }
 
+/**
+ * A vector: components, plus where its arrow is drawn from. Arithmetic works
+ * on the components alone, so the anchor only ever affects the picture.
+ */
+export interface VectorValue {
+  readonly kind: 'vector';
+  readonly components: readonly number[];
+  readonly anchor: Point;
+}
+
+export interface MatrixValue {
+  readonly kind: 'matrix';
+  readonly rows: readonly (readonly number[])[];
+}
+
 export interface PolygonValue {
   readonly kind: 'polygon';
   readonly vertices: readonly Point[];
@@ -49,6 +64,8 @@ export interface PolygonValue {
 export type Value =
   | NumberValue
   | PointValue
+  | VectorValue
+  | MatrixValue
   | LineValue
   | CircleValue
   | PolygonValue;
@@ -77,6 +94,22 @@ export const polygon = (vertices: readonly Point[]): PolygonValue => ({
   vertices: vertices.map((vertex) => ({ x: vertex.x, y: vertex.y })),
 });
 
+export const ORIGIN: Point = { x: 0, y: 0 };
+
+export const vector = (
+  components: readonly number[],
+  anchor: Point = ORIGIN,
+): VectorValue => ({
+  kind: 'vector',
+  components: [...components],
+  anchor: { x: anchor.x, y: anchor.y },
+});
+
+export const matrix = (rows: readonly (readonly number[])[]): MatrixValue => ({
+  kind: 'matrix',
+  rows: rows.map((row) => [...row]),
+});
+
 export function isNumber(value: Value): value is NumberValue {
   return value.kind === 'number';
 }
@@ -91,7 +124,7 @@ export function isLine(value: Value): value is LineValue {
 
 /** True for values the canvas can draw. */
 export function isGeometry(value: Value): boolean {
-  return value.kind !== 'number';
+  return value.kind !== 'number' && value.kind !== 'matrix';
 }
 
 /** The article-free name of a kind, for error messages. */
@@ -107,6 +140,10 @@ export function describeKind(kind: ValueKind): string {
       return 'circle';
     case 'polygon':
       return 'polygon';
+    case 'vector':
+      return 'vector';
+    case 'matrix':
+      return 'matrix';
   }
 }
 
@@ -130,5 +167,11 @@ export function describeValue(value: Value, format: (n: number) => string): stri
       return `circle at (${format(value.center.x)}, ${format(value.center.y)}), radius ${format(value.radius)}`;
     case 'polygon':
       return `polygon with ${value.vertices.length} vertices`;
+    case 'vector':
+      // Wrapped rather than passed directly: map would hand the callback an
+      // index as its second argument.
+      return `<${value.components.map((component) => format(component)).join(', ')}>`;
+    case 'matrix':
+      return `${value.rows.length}\u00d7${value.rows[0]?.length ?? 0} matrix`;
   }
 }
