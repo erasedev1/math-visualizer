@@ -14,6 +14,8 @@ export interface ExpressionRowProps {
   readonly color: string;
   readonly selected: boolean;
   readonly autoFocus: boolean;
+  /** False for the blank row the list always keeps at the end. */
+  readonly removable: boolean;
   /** Present when this entry defines a draggable number. */
   readonly slider: SliderConfig | null;
   readonly onChange: (source: string) => void;
@@ -27,7 +29,7 @@ export interface ExpressionRowProps {
 }
 
 export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
-  const { entry, result, color, selected, autoFocus, slider } = props;
+  const { entry, result, color, selected, autoFocus, removable, slider } = props;
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -62,7 +64,6 @@ export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
           value={entry.source}
           spellCheck={false}
           autoComplete="off"
-          placeholder="Enter an expression, e.g. sin(x)"
           aria-label="Expression"
           onChange={(event) => props.onChange(event.target.value)}
           onFocus={props.onSelect}
@@ -97,15 +98,19 @@ export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
         {status !== null && <p className="expression-status">{status}</p>}
       </div>
 
-      <button
-        type="button"
-        className="row-action"
-        onClick={props.onRemove}
-        title="Delete this expression"
-        aria-label="Delete this expression"
-      >
-        &times;
-      </button>
+      {removable ? (
+        <button
+          type="button"
+          className="row-action"
+          onClick={props.onRemove}
+          title="Delete this expression"
+          aria-label="Delete this expression"
+        >
+          &times;
+        </button>
+      ) : (
+        <span className="row-action-placeholder" aria-hidden="true" />
+      )}
     </li>
   );
 }

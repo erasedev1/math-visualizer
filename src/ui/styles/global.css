@@ -185,7 +185,6 @@ code {
   padding: 4px 0 16px;
 }
 
-.panel-empty,
 .hint {
   margin: 8px 12px;
   font-size: 12px;
@@ -283,6 +282,11 @@ code {
 .expression-row[data-state='value'] .expression-status,
 .expression-row[data-state='function'] .expression-status {
   color: var(--text-muted);
+}
+
+.row-action-placeholder {
+  display: block;
+  width: 22px;
 }
 
 .row-action {

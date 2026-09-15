@@ -66,6 +66,32 @@ export function insertEntryAfter(
   return [...entries.slice(0, index + 1), entry, ...entries.slice(index + 1)];
 }
 
+/**
+ * Keeps one blank entry at the end of the list.
+ *
+ * The blank row is where the next expression gets typed, so it takes the place
+ * of an "add" button: there is always somewhere to start writing, and filling
+ * the last row opens another one below it. The same array comes back when the
+ * invariant already holds, so the animation loop still bails out of rendering
+ * when nothing has moved.
+ */
+export function withTrailingBlank(
+  entries: ExpressionEntry[],
+  paletteSize: number,
+): ExpressionEntry[] {
+  const last = entries[entries.length - 1];
+  if (last !== undefined && last.source.trim() === '') return entries;
+  return [...entries, createEntry('', nextColorIndex(entries, paletteSize))];
+}
+
+/** True for the blank row the list always keeps at the end. */
+export function isTrailingBlank(
+  entries: readonly ExpressionEntry[],
+  index: number,
+): boolean {
+  return index === entries.length - 1 && entries[index]?.source.trim() === '';
+}
+
 export function removeEntry(
   entries: readonly ExpressionEntry[],
   id: string,

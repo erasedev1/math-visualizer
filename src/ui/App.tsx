@@ -32,23 +32,14 @@ import {
   updateEntry,
   vectorSource,
   withBody,
+  withTrailingBlank,
   withValue,
   type ExpressionEntry,
 } from './state/entries';
 
-const INITIAL_SOURCES = [
-  'a = 2',
-  'f(x) = a sin(x)',
-  'A = (-4, -2)',
-  'B = (5, 3)',
-  's = segment(A, B)',
-  'v = <3, 4>',
-  'M = [[1, 2], [3, 4]]',
-  'd = det(M)',
-];
-
+/** An empty workspace: one blank row, waiting to be typed in. */
 function initialEntries(): ExpressionEntry[] {
-  return INITIAL_SOURCES.map((source, index) => createEntry(source, index));
+  return [createEntry('', 0)];
 }
 
 const INITIAL_SPAN_X = 20;
@@ -60,14 +51,15 @@ function initialViewport(): Viewport {
 export function App(): React.JSX.Element {
   const [entries, setEntries] = useState<ExpressionEntry[]>(initialEntries);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [focusId, setFocusId] = useState<string | null>(null);
+  // The blank row is the only place to start, so it holds the caret on load.
+  const [focusId, setFocusId] = useState<string | null>(() => entries[0]?.id ?? null);
   const [viewport, setViewport] = useState<Viewport>(initialViewport);
   // Dragging reads the live viewport to decide how precisely to write
   // coordinates, without making the drag callback change every frame.
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
   const [theme, setTheme] = useState<ThemeName>(() => readTheme());
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [stats, setStats] = useState<RenderStats | null>(null);
 
@@ -82,6 +74,17 @@ export function App(): React.JSX.Element {
     previousRef.current = next;
     return next;
   }, [entries]);
+
+  /** Applies an edit and restores the trailing blank row. */
+  const commitEntries = useCallback(
+    (update: (previous: ExpressionEntry[]) => ExpressionEntry[]) => {
+      setEntries((previous) => {
+        const next = update(previous);
+        return next === previous ? previous : withTrailingBlank(next, palette.length);
+      });
+    },
+    [palette.length],
+  );
 
   const colorOf = useCallback(
     (entry: ExpressionEntry) => seriesColor(graphTheme(theme), entry.colorIndex),
@@ -129,22 +132,43 @@ export function App(): React.JSX.Element {
     return { curves, objects };
   }, [entries, workspace, colorOf]);
 
-  const handleAdd = useCallback(
-    (afterId: string | null) => {
-      setEntries((previous) => {
-        const entry = createEntry('', nextColorIndex(previous, palette.length));
-        setSelectedId(entry.id);
-        setFocusId(entry.id);
-        return insertEntryAfter(previous, afterId, entry);
-      });
+  /**
+   * Enter opens the next row. It never stacks blank rows: on the blank row at
+   * the end there is nowhere further to go, and when the row below is already
+   * blank that one is focused rather than a new one being made.
+   */
+  const handleEnter = useCallback(
+    (id: string) => {
+      const index = entries.findIndex((entry) => entry.id === id);
+      if (index < 0) return;
+
+      const current = entries[index];
+      if (current !== undefined && current.source.trim() === '' && index === entries.length - 1) {
+        return;
+      }
+
+      const following = entries[index + 1];
+      if (following !== undefined && following.source.trim() === '') {
+        setSelectedId(following.id);
+        setFocusId(following.id);
+        return;
+      }
+
+      const entry = createEntry('', nextColorIndex(entries, palette.length));
+      setSelectedId(entry.id);
+      setFocusId(entry.id);
+      commitEntries((previous) => insertEntryAfter(previous, id, entry));
     },
-    [palette.length],
+    [entries, palette.length, commitEntries],
   );
 
-  const handleChange = useCallback((id: string, source: string) => {
-    setFocusId(null);
-    setEntries((previous) => updateEntry(previous, id, { source }));
-  }, []);
+  const handleChange = useCallback(
+    (id: string, source: string) => {
+      setFocusId(null);
+      commitEntries((previous) => updateEntry(previous, id, { source }));
+    },
+    [commitEntries],
+  );
 
   const handlePatch = useCallback(
     (patch: Partial<Omit<ExpressionEntry, 'id'>>) => {
@@ -156,10 +180,10 @@ export function App(): React.JSX.Element {
 
   const handleRemove = useCallback(
     (id: string) => {
-      setEntries((previous) => removeEntry(previous, id));
+      commitEntries((previous) => removeEntry(previous, id));
       if (selectedId === id) setSelectedId(null);
     },
-    [selectedId],
+    [selectedId, commitEntries],
   );
 
   const handleToggleVisible = useCallback((id: string) => {
@@ -297,7 +321,7 @@ export function App(): React.JSX.Element {
           onSelect={setSelectedId}
           onToggleVisible={handleToggleVisible}
           onRemove={handleRemove}
-          onAdd={handleAdd}
+          onEnter={handleEnter}
           onSliderValue={handleSliderValue}
           onTogglePlay={handleTogglePlay}
           onMatrixChange={handleMatrixChange}
