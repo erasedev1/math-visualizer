@@ -175,3 +175,12 @@ export function describeValue(value: Value, format: (n: number) => string): stri
       return `${value.rows.length}\u00d7${value.rows[0]?.length ?? 0} matrix`;
   }
 }
+
+/**
+ * Whether a value can be drawn as plane vectors: a matrix of two rows, whose
+ * columns are points in the plane. For a linear map those columns are exactly
+ * where the basis vectors land, which is what makes drawing them worthwhile.
+ */
+export function drawableAsVectors(value: Value): value is MatrixValue {
+  return value.kind === 'matrix' && value.rows.length === 2;
+}

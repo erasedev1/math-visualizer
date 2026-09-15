@@ -19,6 +19,8 @@ export interface ExpressionEntry {
   readonly visible: boolean;
   /** Slider settings, once the user has adjusted them. */
   readonly slider: SliderConfig | null;
+  /** Draw a matrix's columns as arrows on the graph. */
+  readonly showVectors: boolean;
 }
 
 export const DEFAULT_LINE_WIDTH = 2;
@@ -36,6 +38,7 @@ export function createEntry(source = '', colorIndex = 0): ExpressionEntry {
     lineWidth: DEFAULT_LINE_WIDTH,
     visible: true,
     slider: null,
+    showVectors: false,
   };
 }
 

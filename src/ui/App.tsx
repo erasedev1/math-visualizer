@@ -12,7 +12,7 @@ import {
   type SliderConfig,
 } from '@/core/workspace/slider';
 import { resultCurve, resultShape } from '@/core/workspace/types';
-import type { Value } from '@/core/values/types';
+import { drawableAsVectors, ORIGIN, type MatrixValue, type Value } from '@/core/values/types';
 import type { SceneObject } from '@/rendering/2d/objects';
 import { formatNumber } from '@/core/expression/print';
 import { graphTheme, seriesColor, type ThemeName } from '@/rendering/2d/theme';
@@ -117,13 +117,20 @@ export function App(): React.JSX.Element {
 
     const objects = entries.flatMap((entry) => {
       const result = workspace.results.get(entry.id);
-      const shape = result === undefined ? null : resultShape(result);
-      if (!entry.visible || shape === null || result?.kind !== 'value') return [];
+      if (!entry.visible || result?.kind !== 'value') return [];
+
       const style = {
         color: colorOf(entry),
         width: entry.lineWidth,
         ...(result.name === null ? {} : { label: result.name }),
       };
+
+      if (entry.showVectors && drawableAsVectors(result.value)) {
+        return matrixColumns(entry.id, result.value, style, result.name);
+      }
+
+      const shape = resultShape(result);
+      if (shape === null) return [];
       const movable =
         result.literal?.kind === 'point' || result.literal?.kind === 'vector';
       return toSceneObjects(entry.id, shape, style, movable);
@@ -185,6 +192,14 @@ export function App(): React.JSX.Element {
     },
     [selectedId, commitEntries],
   );
+
+  const handleToggleVectors = useCallback((id: string) => {
+    setEntries((previous) => {
+      const entry = previous.find((candidate) => candidate.id === id);
+      if (entry === undefined) return previous;
+      return updateEntry(previous, id, { showVectors: !entry.showVectors });
+    });
+  }, []);
 
   const handleToggleVisible = useCallback((id: string) => {
     setEntries((previous) => {
@@ -325,6 +340,7 @@ export function App(): React.JSX.Element {
           onSliderValue={handleSliderValue}
           onTogglePlay={handleTogglePlay}
           onMatrixChange={handleMatrixChange}
+          onToggleVectors={handleToggleVectors}
         />
 
         <div className="canvas-area">
@@ -444,6 +460,42 @@ function toSceneObjects(
     case 'matrix':
       return [];
   }
+}
+
+const SUBSCRIPT_DIGITS = '\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089';
+
+/** `M` and 2 becomes `M₂`, which is how a column is written. */
+function subscript(value: number): string {
+  return String(value)
+    .split('')
+    .map((digit) => SUBSCRIPT_DIGITS[Number(digit)] ?? digit)
+    .join('');
+}
+
+/**
+ * The columns of a two-row matrix, as arrows from the origin. One entry
+ * produces several objects, which the scene already allows for.
+ */
+function matrixColumns(
+  id: string,
+  value: MatrixValue,
+  style: { color: string; width: number; label?: string },
+  name: string | null,
+): SceneObject[] {
+  const [top, bottom] = value.rows as [readonly number[], readonly number[]];
+  return top.map((x, index) => ({
+    kind: 'vector' as const,
+    id: `${id}:column-${index + 1}`,
+    anchor: ORIGIN,
+    tip: { x, y: bottom[index] ?? 0 },
+    // Columns are edited in the grid, which is where the numbers live.
+    movable: false,
+    style: {
+      color: style.color,
+      width: style.width,
+      ...(name === null ? {} : { label: `${name}${subscript(index + 1)}` }),
+    },
+  }));
 }
 
 /** Enough decimals to place a point where the pointer actually is. */

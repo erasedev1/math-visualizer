@@ -4,7 +4,9 @@ export interface MatrixEditorProps {
   readonly rows: readonly (readonly number[])[];
   /** Editable only when the definition is a literal that can be written back. */
   readonly editable: boolean;
+  readonly showVectors: boolean;
   readonly onChange: (rows: readonly (readonly number[])[]) => void;
+  readonly onToggleVectors: () => void;
 }
 
 const MAX_ROWS = 12;
@@ -19,7 +21,7 @@ const MAX_COLUMNS = 12;
  * to, so it is shown but not edited.
  */
 export function MatrixEditor(props: MatrixEditorProps): React.JSX.Element {
-  const { rows, editable } = props;
+  const { rows, editable, showVectors } = props;
   const columns = rows[0]?.length ?? 0;
 
   const setCell = (row: number, column: number, value: number) => {
@@ -67,49 +69,67 @@ export function MatrixEditor(props: MatrixEditorProps): React.JSX.Element {
         )}
       </div>
 
-      {editable && (
-        <div className="matrix-controls">
-          <span className="matrix-size mono">
-            {rows.length}&times;{columns}
-          </span>
-          <button
-            type="button"
-            onClick={() => resize(rows.length, Math.max(1, columns - 1))}
-            disabled={columns <= 1}
-            aria-label="Remove a column"
-            title="Remove a column"
-          >
-            &minus;col
-          </button>
-          <button
-            type="button"
-            onClick={() => resize(rows.length, Math.min(MAX_COLUMNS, columns + 1))}
-            disabled={columns >= MAX_COLUMNS}
-            aria-label="Add a column"
-            title="Add a column"
-          >
-            +col
-          </button>
-          <button
-            type="button"
-            onClick={() => resize(Math.max(1, rows.length - 1), columns)}
-            disabled={rows.length <= 1}
-            aria-label="Remove a row"
-            title="Remove a row"
-          >
-            &minus;row
-          </button>
-          <button
-            type="button"
-            onClick={() => resize(Math.min(MAX_ROWS, rows.length + 1), columns)}
-            disabled={rows.length >= MAX_ROWS}
-            aria-label="Add a row"
-            title="Add a row"
-          >
-            +row
-          </button>
-        </div>
-      )}
+      <div className="matrix-controls">
+        <span className="matrix-size mono">
+          {rows.length}&times;{columns}
+        </span>
+
+        <button
+          type="button"
+          className="matrix-vectors-toggle"
+          onClick={props.onToggleVectors}
+          aria-pressed={showVectors}
+          data-active={showVectors}
+          title={
+            showVectors
+              ? 'Stop drawing the columns as vectors'
+              : 'Draw each column as a vector on the graph'
+          }
+        >
+          {'\u2197'} vectors
+        </button>
+
+        {editable && (
+          <>
+              <button
+              type="button"
+              onClick={() => resize(rows.length, Math.max(1, columns - 1))}
+              disabled={columns <= 1}
+              aria-label="Remove a column"
+              title="Remove a column"
+            >
+              &minus;col
+            </button>
+            <button
+              type="button"
+              onClick={() => resize(rows.length, Math.min(MAX_COLUMNS, columns + 1))}
+              disabled={columns >= MAX_COLUMNS}
+              aria-label="Add a column"
+              title="Add a column"
+            >
+              +col
+            </button>
+            <button
+              type="button"
+              onClick={() => resize(Math.max(1, rows.length - 1), columns)}
+              disabled={rows.length <= 1}
+              aria-label="Remove a row"
+              title="Remove a row"
+            >
+              &minus;row
+            </button>
+            <button
+              type="button"
+              onClick={() => resize(Math.min(MAX_ROWS, rows.length + 1), columns)}
+              disabled={rows.length >= MAX_ROWS}
+              aria-label="Add a row"
+              title="Add a row"
+            >
+              +row
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -132,6 +132,29 @@ function expectPair(args: readonly Value[], name: string): [VectorValue, VectorV
   return [first, second];
 }
 
+/**
+ * A one-based index into a matrix, as people write them. Returns the
+ * zero-based position the arrays actually use.
+ */
+function expectIndex(
+  args: readonly Value[],
+  position: number,
+  available: number,
+  name: string,
+  what: string,
+): number {
+  const raw = expectNumber(args, position, name);
+  if (!Number.isInteger(raw)) {
+    throw new ExpressionError(`${name} needs a whole ${what} number, but got ${raw}`);
+  }
+  if (raw < 1 || raw > available) {
+    throw new ExpressionError(
+      `This matrix has ${available} ${what}${available === 1 ? '' : 's'}, so ${what} ${raw} does not exist`,
+    );
+  }
+  return raw - 1;
+}
+
 function dotProduct(a: VectorValue, b: VectorValue): number {
   return a.components.reduce((total, component, i) => total + component * b.components[i]!, 0);
 }
@@ -386,6 +409,34 @@ const DEFINITIONS: readonly ValueFunction[] = [
         throw new ExpressionError('This system has no single solution');
       }
       return vector(solution);
+    },
+  ),
+
+  define(
+    'column',
+    'column(M, j)',
+    'The j-th column of a matrix, as a vector. Columns count from 1',
+    2,
+    2,
+    (args) => {
+      const source = expectMatrix(args, 0, 'column');
+      const { rows, columns } = linear.dimensions(source.rows);
+      const index = expectIndex(args, 1, columns, 'column', 'column');
+      return vector(source.rows.map((entry) => entry[index]!).slice(0, rows));
+    },
+  ),
+
+  define(
+    'row',
+    'row(M, i)',
+    'The i-th row of a matrix, as a vector. Rows count from 1',
+    2,
+    2,
+    (args) => {
+      const source = expectMatrix(args, 0, 'row');
+      const { rows } = linear.dimensions(source.rows);
+      const index = expectIndex(args, 1, rows, 'row', 'row');
+      return vector(source.rows[index]!);
     },
   ),
 

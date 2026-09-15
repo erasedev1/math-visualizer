@@ -245,3 +245,35 @@ describe('describeValue', () => {
     expect(describeValue(matrix([[1, 2], [3, 4]]), formatDisplayNumber)).toBe('2\u00d72 matrix');
   });
 });
+
+describe('column and row', () => {
+  const M = { M: matrix([[1, 2, 3], [4, 5, 6]]) as Value };
+
+  it('takes a column as a vector, counting from one', () => {
+    expect(components('column(M, 1)', M)).toEqual([1, 4]);
+    expect(components('column(M, 3)', M)).toEqual([3, 6]);
+  });
+
+  it('takes a row as a vector, counting from one', () => {
+    expect(components('row(M, 1)', M)).toEqual([1, 2, 3]);
+    expect(components('row(M, 2)', M)).toEqual([4, 5, 6]);
+  });
+
+  it('reports an index that does not exist', () => {
+    expect(() => evaluate('column(M, 4)', M)).toThrow(/has 3 columns, so column 4 does not exist/);
+    expect(() => evaluate('row(M, 0)', M)).toThrow(/has 2 rows, so row 0 does not exist/);
+    expect(() => evaluate('column(M, 1.5)', M)).toThrow(/whole column number/);
+  });
+
+  it('recovers the matrix it came from', () => {
+    // The columns of the identity are the basis vectors.
+    expect(components('column(identity(2), 1)')).toEqual([1, 0]);
+    expect(components('column(identity(2), 2)')).toEqual([0, 1]);
+  });
+
+  it('shows where a linear map sends the basis vectors', () => {
+    // A quarter turn sends (1, 0) to (0, 1).
+    expect(components('column([[0, -1], [1, 0]], 1)')).toEqual([0, 1]);
+    expect(components('column([[0, -1], [1, 0]], 2)')).toEqual([-1, 0]);
+  });
+});

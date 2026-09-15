@@ -46,8 +46,12 @@ absent from the interface.
 - Matrices, written `M = [[1, 2], [3, 4]]`, with an editable grid instead of a
   wall of brackets: add and remove rows and columns, type into a cell, and
   everything downstream recomputes. `transpose`, `det`, `rank`, `inverse`,
-  `solve`, `identity`, `eigenvalues` and `eigenvectors`, plus the products
-  between matrices, vectors and numbers.
+  `solve`, `identity`, `column`, `row`, `eigenvalues` and `eigenvectors`, plus
+  the products between matrices, vectors and numbers.
+- A matrix of two rows can be drawn as vectors, one arrow per column, from a
+  toggle beside its grid. For a linear map those columns are where the basis
+  vectors land, so `eigenvectors(M)` drawn this way shows the directions the
+  map leaves alone. Computed matrices can be drawn as readily as typed ones.
 - Appearance: per-object colour, line width and visibility; light and dark
   themes.
 - 318 automated tests covering parsing, evaluation, printing, viewport
