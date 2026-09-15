@@ -78,6 +78,21 @@ npm run build      # typecheck and produce a production build
 
 Requires Node 20 or newer.
 
+## Deploying
+
+The site is static, so GitHub Pages can serve it directly.
+`.github/workflows/deploy.yml` builds `main` on every push — it runs the
+test suite, then `npm run build`, then publishes `dist/` — so the only
+one-time setup is in the repository settings:
+
+**Settings → Pages → Build and deployment → Source: GitHub Actions**
+
+The site then lives at `https://<owner>.github.io/<repo>/`. The build uses
+a relative `base` (see `vite.config.ts`), so it also works unchanged from a
+user page, a custom domain, or any other subdirectory. To publish from a
+branch other than `main`, edit the `branches` list at the top of the
+workflow; to deploy without pushing, run the workflow from the Actions tab.
+
 ## Architecture
 
 The stack is Vite + React + TypeScript with Vitest, and no mathematics
