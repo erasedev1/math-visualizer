@@ -470,7 +470,7 @@ function resolve(
   const known = [...local, ...Object.keys(BUILTIN_CONSTANTS)];
   const referenced = [
     ...freeVariables(definition.body, known),
-    ...calledFunctions(definition.body).filter((name) => !isBuiltinFunction(name)),
+    ...calledFunctions(definition.body),
   ];
 
   const dependencies = new Set<string>();
@@ -478,11 +478,17 @@ function resolve(
   for (const name of new Set(referenced)) {
     // `f'` reads whatever defines `f`: the derivative is not a separate entry,
     // so it depends on, and changes with, the definition it came from.
-    const { base, order } = splitPrimes(name);
-    if (order > 0 && isBuiltinFunction(base)) continue;
+    const { base } = splitPrimes(name);
     const owner = names.get(base);
-    if (owner === undefined) unresolved.add(base);
-    else dependencies.add(owner);
+    if (owner !== undefined) {
+      dependencies.add(owner);
+      continue;
+    }
+    // A name the language itself supplies is neither a dependency nor unknown.
+    // That includes one written without brackets, as `integral(sin, 0, pi)`
+    // does, which is a use of `sin` rather than a call to it.
+    if (isBuiltinFunction(base)) continue;
+    unresolved.add(base);
   }
   return { dependencies: [...dependencies], unresolved: [...unresolved] };
 }

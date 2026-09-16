@@ -59,15 +59,25 @@ deliberately absent from the interface.
   and can be differentiated again. Built-in functions differentiate by the same
   mechanism, so `sin'(x)` works too. A step function such as `floor` declares
   no rule and is refused by name rather than reported as zero.
+- Numerical calculus over any function in the workspace, written by name:
+  `integral(f, 0, 3)` by adaptive Simpson's rule, `root(f, 1, 2)` by Brent's
+  method, and `minimum`, `maximum`, `argmin` and `argmax` over an interval.
+  Built-in functions work the same way (`integral(sin, 0, pi)`), the limits can
+  be parameters, and because the function is resolved where the call is
+  compiled, `y = integral(f, 0, x)` plots the antiderivative. Differentiating
+  it gives `f` back: the fundamental theorem is one of the derivative rules.
+- A tangent line needs nothing new: with a slider `a`, the line
+  `y = f(a) + f'(a)(x - a)` touches the curve at `a` and follows the slider.
 - Appearance: per-object colour, line width and visibility; light and dark
   themes.
-- 421 automated tests covering parsing, evaluation, printing, viewport
+- 457 automated tests covering parsing, evaluation, printing, viewport
   transforms, tick selection, sampling, clipping, picking, dependency
   ordering, reactive propagation, plane geometry, linear algebra, slider
-  behaviour and differentiation, checked against analytical results and, for
-  every derivative rule, against a central difference.
+  behaviour, differentiation and numerical methods, checked against analytical
+  results — every derivative rule against a central difference, and every
+  integral against its closed form.
 
-**Not built yet** — integrals, roots, statistics, tables, notebook blocks,
+**Not built yet** — statistics, tables, notebook blocks,
 units, engineering modules, 3D, the AI tool layer, project files and
 undo/redo. The UI does not contain controls for any of them.
 
@@ -77,7 +87,9 @@ numeric path, so a function cannot yet read a point, a vector or a matrix
 Intersections are between lines, rays and segments. `eigenvalues` covers
 symmetric matrices of any size and any 2x2; anything else, including complex
 eigenvalues, is refused rather than approximated. Only plane vectors are
-drawn, though longer ones compute normally.
+drawn, though longer ones compute normally. `minimum` and its relatives scan
+the interval before refining, so a dip narrower than the scan can hide from
+them, and `root` wants a bracket that changes sign rather than hunting for one.
 
 ## Running it
 
@@ -121,7 +133,8 @@ src/
                   algebra, and the functions over them
     workspace/    dependency graph, reactive evaluation, slider behaviour
     plot/         compiles an expression into a drawable curve
-    calculus/     symbolic differentiation, simplification, prime notation
+    calculus/     symbolic differentiation, simplification, prime notation,
+                  adaptive quadrature, root finding, extremum search
   rendering/
     2d/           viewport transforms, tick selection, adaptive sampler,
                   grid/axis renderer, curve and object renderers, line
@@ -220,6 +233,11 @@ expressions.
   `2 * x^(2 - 1) * 1` — but only identities, constant folding and sign
   normalisation are done. A half-finished computer algebra system would be
   worse than an honest `2x`, so `1/3` and `ln(10)` are left as they are.
+- **A function passed by name is resolved where the call is compiled.**
+  `integral(f, 0, x)` looks `f` up once, at compile time, and the compiled
+  closure integrates a plain function of one number on every sample. So the
+  value domain needs no function kind, the unboxed numeric path is preserved,
+  and plotting an antiderivative works rather than being a later milestone.
 - **Refusals over approximations.** A singular matrix has no inverse, a
   rotation has no real eigenvalues, and a system can have no single solution.
   Each says so on the entry that caused it rather than returning a

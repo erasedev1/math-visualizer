@@ -143,6 +143,22 @@ describe('prime notation in a workspace', () => {
     expect(second.recomputed.has('g')).toBe(false);
   });
 
+  it('needs nothing else to draw a tangent line', () => {
+    const state = evaluateWorkspace(
+      workspace(
+        ['a', 'a = 1.5'],
+        ['f', 'f(x) = x^2'],
+        ['t', "y = f(a) + f'(a)(x - a)"],
+      ),
+    );
+    // The tangent to x^2 at 1.5 is y = 3x - 2.25: it touches there and has the
+    // slope of the curve.
+    const tangent = curveOf(state, 't');
+    expect(tangent.evaluate(1.5)).toBeCloseTo(2.25, 12);
+    expect(tangent.evaluate(2.5)).toBeCloseTo(5.25, 12);
+    expect(tangent.evaluate(0)).toBeCloseTo(-2.25, 12);
+  });
+
   it('reads the derivative of a derivative as one more prime', () => {
     const state = evaluateWorkspace(
       workspace(['f', 'f(x) = x^5'], ['g', "g(x) = f'(x)"], ['d', "p = g'(2)"]),

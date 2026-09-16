@@ -79,10 +79,14 @@ export function FunctionReference(): React.JSX.Element {
                 <span>
                   {definition.description}
                   {/* Read from the registry, so the list cannot claim a
-                      derivative exists where no rule is declared. */}
-                  {definition.derivative === undefined && (
-                    <em className="reference-note"> · no derivative</em>
-                  )}
+                      derivative exists where no rule is declared. Only shown
+                      where a prime could be written, which is on a function of
+                      exactly one argument. */}
+                  {definition.derivative === undefined &&
+                    definition.minArgs === 1 &&
+                    definition.maxArgs === 1 && (
+                      <em className="reference-note"> · no derivative</em>
+                    )}
                 </span>
               </li>
             ))}

@@ -1,3 +1,9 @@
+import {
+  findExtremum,
+  findRoot,
+  integrate,
+  type UnaryFunction,
+} from '../calculus/numeric';
 import { binary, call, num, unary, type Expr } from './ast';
 import { ExpressionError } from './errors';
 
@@ -13,6 +19,12 @@ import { ExpressionError } from './errors';
  * reason. `core/calculus/derive.ts` knows the rules of the calculus — sums,
  * products, quotients, powers and the chain rule — but nothing about `sin`;
  * adding `erf` means adding one line here, not editing a differentiator.
+ *
+ * A few entries take a function rather than a number as their first argument.
+ * They live here with everything else, so the parser, the compiler, the value
+ * evaluator and the on-screen reference find them where they find `sin`; the
+ * numerical methods they call are in `core/calculus/numeric.ts`, which knows
+ * nothing about expressions.
  */
 
 /**
@@ -35,7 +47,20 @@ export interface FunctionDefinition {
   readonly description: string;
   /** Absent when the function has no derivative, as `floor` does not. */
   readonly derivative?: DerivativeRule | undefined;
+  /**
+   * Set on a function whose first argument is another function written by
+   * name, as in `integral(f, 0, 1)`. The name is resolved where the call is
+   * compiled rather than where it is applied, so plotting one of these stays
+   * on the unboxed numeric path and the value domain needs no function kind.
+   */
+  readonly higherOrder?: HigherOrderApplication | undefined;
 }
+
+/** Applies a higher-order function to the resolved function and the rest. */
+export type HigherOrderApplication = (
+  target: UnaryFunction,
+  args: readonly number[],
+) => number;
 
 export type FunctionRegistry = ReadonlyMap<string, FunctionDefinition>;
 
@@ -80,6 +105,74 @@ export function powerRule(
     times(times(exponent, raise(base, minus(exponent, ONE))), dBase),
     times(times(raise(base, exponent), call('ln', [base])), dExponent),
   );
+}
+
+/**
+ * A function whose first argument is another function.
+ *
+ * `apply` is unreachable — every path that can call one of these resolves the
+ * function argument first — but saying so out loud beats a cast, and the
+ * message is the right one if a later path forgets.
+ */
+function higher(
+  name: string,
+  signature: string,
+  description: string,
+  higherOrder: HigherOrderApplication,
+  derivative?: DerivativeRule,
+): FunctionDefinition {
+  return {
+    name,
+    signature,
+    description,
+    minArgs: 3,
+    maxArgs: 3,
+    higherOrder,
+    derivative,
+    apply: () => {
+      throw new ExpressionError(`${name} takes a function as its first argument`);
+    },
+  };
+}
+
+/**
+ * Resolves the name in a higher-order call to something callable.
+ *
+ * It has to be a name: `integral(f, 0, 1)` reads `f` itself, where
+ * `integral(f(x), 0, 1)` would ask for a number that has no value yet. Saying
+ * which of the two was written is most of the help this can give.
+ */
+export function resolveFunctionArgument(
+  node: Expr | undefined,
+  functions: FunctionRegistry,
+  callee: string,
+): UnaryFunction {
+  if (node === undefined || node.type !== 'Identifier') {
+    const written = node?.type === 'Call' ? `; write ${node.callee}, not ${node.callee}(...)` : '';
+    throw new ExpressionError(
+      `${callee} takes a function as its first argument, written by name${written}`,
+    );
+  }
+
+  const definition = functions.get(node.name);
+  if (definition === undefined) {
+    throw new ExpressionError(
+      `${callee} takes a function as its first argument, and "${node.name}" is not a function`,
+    );
+  }
+  if (definition.higherOrder !== undefined) {
+    throw new ExpressionError(
+      `${node.name} takes a function of its own, so it cannot be passed to ${callee}`,
+    );
+  }
+  if (definition.minArgs > 1 || definition.maxArgs < 1) {
+    throw new ExpressionError(
+      `${callee} takes a function of one variable, and ${arityMessage(definition)}`,
+    );
+  }
+
+  const { apply } = definition;
+  return (x) => apply([x]);
 }
 
 function fn(
@@ -240,6 +333,58 @@ const DEFINITIONS: readonly FunctionDefinition[] = [
   fn1('trunc', 'Integer part of x', Math.trunc),
   fn1('fract', 'Fractional part of x', (x) => x - Math.floor(x)),
   fn2('mod', 'mod(a, b)', 'Remainder of a/b, with the sign of b', (a, b) => a - b * Math.floor(a / b)),
+
+  // Calculus. These take a function by name and numbers after it; the methods
+  // themselves are in core/calculus/numeric.ts.
+  higher(
+    'integral',
+    'integral(f, a, b)',
+    'The definite integral of f from a to b',
+    (target, args) => integrate(target, args[0]!, args[1]!),
+    // The fundamental theorem, in the form that also covers a moving lower
+    // limit: d/dt of the integral is f at the top times how the top moves,
+    // less f at the bottom times how the bottom moves.
+    (args, d) => {
+      const target = args[0];
+      if (target?.type !== 'Identifier') {
+        throw new ExpressionError('integral takes a function as its first argument');
+      }
+      return minus(
+        times(call(target.name, [args[2]!]), d[2]!),
+        times(call(target.name, [args[1]!]), d[1]!),
+      );
+    },
+  ),
+  higher(
+    'root',
+    'root(f, a, b)',
+    'Where f is zero between a and b, which must bracket a sign change',
+    (target, args) => findRoot(target, args[0]!, args[1]!),
+  ),
+  higher(
+    'minimum',
+    'minimum(f, a, b)',
+    'The least value f takes between a and b',
+    (target, args) => findExtremum(target, args[0]!, args[1]!, 'minimum').value,
+  ),
+  higher(
+    'maximum',
+    'maximum(f, a, b)',
+    'The greatest value f takes between a and b',
+    (target, args) => findExtremum(target, args[0]!, args[1]!, 'maximum').value,
+  ),
+  higher(
+    'argmin',
+    'argmin(f, a, b)',
+    'Where f is least between a and b',
+    (target, args) => findExtremum(target, args[0]!, args[1]!, 'minimum').x,
+  ),
+  higher(
+    'argmax',
+    'argmax(f, a, b)',
+    'Where f is greatest between a and b',
+    (target, args) => findExtremum(target, args[0]!, args[1]!, 'maximum').x,
+  ),
 
   // Variadic helpers.
   fn('min', 'min(a, b, ...)', 'Smallest argument', 1, Infinity, (args) => Math.min(...args)),
