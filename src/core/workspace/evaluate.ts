@@ -19,6 +19,7 @@ import {
 } from '../expression/definition';
 import { describeError, isExpressionError } from '../expression/errors';
 import {
+  arityMessage,
   BUILTIN_CONSTANTS,
   BUILTIN_FUNCTIONS,
   type FunctionDefinition,
@@ -732,8 +733,16 @@ function missingDerivative(
       // Said here rather than left to the compiler, which would report the
       // primed spelling and suggest defining something that cannot be defined.
       return describeUnknown([base]);
-    } else if (BUILTIN_FUNCTIONS.get(base) === undefined) {
-      return `"${base}" is not a function of one number, so "${written}" has no meaning`;
+    } else {
+      const builtin = BUILTIN_FUNCTIONS.get(base);
+      if (builtin === undefined) {
+        return `"${base}" is not a function of one number, so "${written}" has no meaning`;
+      }
+      if (builtin.minArgs !== 1 || builtin.maxArgs !== 1) {
+        // `log` has a derivative but takes an optional base, so a prime on it
+        // would not say which function is meant.
+        return `Prime notation is for functions of one variable, and ${arityMessage(builtin)}`;
+      }
     }
 
     const supply = context.derivatives.get(base);

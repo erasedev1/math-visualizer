@@ -70,7 +70,7 @@ deliberately absent from the interface.
   `y = f(a) + f'(a)(x - a)` touches the curve at `a` and follows the slider.
 - Appearance: per-object colour, line width and visibility; light and dark
   themes.
-- 457 automated tests covering parsing, evaluation, printing, viewport
+- 460 automated tests covering parsing, evaluation, printing, viewport
   transforms, tick selection, sampling, clipping, picking, dependency
   ordering, reactive propagation, plane geometry, linear algebra, slider
   behaviour, differentiation and numerical methods, checked against analytical

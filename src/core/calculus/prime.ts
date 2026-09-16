@@ -26,8 +26,3 @@ export function splitPrimes(name: string): PrimedName {
 export function primedName(base: string, order: number): string {
   return base + PRIME.repeat(order);
 }
-
-/** True when a name carries at least one prime. */
-export function isPrimed(name: string): boolean {
-  return name.endsWith(PRIME);
-}

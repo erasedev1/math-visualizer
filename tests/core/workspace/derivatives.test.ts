@@ -195,6 +195,24 @@ describe('prime notation that cannot mean anything', () => {
     expect(messageOf(state, 'd')).toContain('functions of one variable');
   });
 
+  it('reports a built-in that does not take exactly one argument', () => {
+    // `log` has a derivative, but an optional base means a prime on it would
+    // not say which function is meant.
+    const state = evaluateWorkspace(workspace(['d', "p = log'(2)"], ['e', "q = min'(2)"]));
+    expect(messageOf(state, 'd')).toContain('functions of one variable');
+    expect(messageOf(state, 'e')).toContain('functions of one variable');
+  });
+
+  it('reports a built-in with no derivative on the entry that asked', () => {
+    const state = evaluateWorkspace(workspace(['d', "p = floor'(2)"]));
+    expect(messageOf(state, 'd')).toBe("floor' is not available: floor has no derivative");
+  });
+
+  it('reports a name that is a function over values, not over numbers', () => {
+    const state = evaluateWorkspace(workspace(['d', "p = midpoint'(2)"]));
+    expect(messageOf(state, 'd')).toContain('is not a function of one number');
+  });
+
   it('reports an undefined name by its base', () => {
     const state = evaluateWorkspace(workspace(['d', "p = nope'(1)"]));
     expect(messageOf(state, 'd')).toBe('Unknown name "nope"; define it to use it here');
