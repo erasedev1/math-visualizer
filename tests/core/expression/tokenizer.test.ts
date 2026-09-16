@@ -32,6 +32,18 @@ describe('tokenize', () => {
     expect(values('sin')).toEqual(['sin', '']);
   });
 
+  it('keeps trailing primes with the name they belong to', () => {
+    expect(values("f'")).toEqual(["f'", '']);
+    expect(values("f''")).toEqual(["f''", '']);
+    expect(values("f'(2)")).toEqual(["f'", '(', '2', ')', '']);
+    // The primes go on the end of a name, not between its letters.
+    expect(values("sin'x")).toEqual(["sin'", 'x', '']);
+  });
+
+  it('rejects a prime with no name in front of it', () => {
+    expect(() => tokenize("'x")).toThrow('Unexpected character');
+  });
+
   it('normalises ** to ^', () => {
     expect(values('2**3')).toEqual(['2', '^', '3', '']);
   });

@@ -1,3 +1,4 @@
+import type { Expr } from '../expression/ast';
 import type { PlottableCurve } from '../plot/curve';
 import type { Value } from '../values/types';
 import { isGeometry } from '../values/types';
@@ -47,14 +48,35 @@ export type LiteralForm =
   | { readonly kind: 'vector'; readonly components: readonly number[] }
   | { readonly kind: 'matrix'; readonly rows: readonly (readonly number[])[] };
 
+/**
+ * A function derived from another by prime notation.
+ *
+ * `f'` is not a definition of its own — it is `f` differentiated, produced
+ * only because some entry asked for it, and it disappears when nothing does.
+ */
+export interface DerivedFunction {
+  readonly name: string;
+  /** How many times the base function was differentiated: 1 for `f'`. */
+  readonly order: number;
+  /** The derivative as an expression, so it can be differentiated again. */
+  readonly body: Expr;
+  readonly call: (args: readonly number[]) => number;
+}
+
 /** A named function, such as `f(x) = a x^2`. */
 export interface FunctionResult extends ResultBase {
   readonly kind: 'function';
   readonly name: string;
   readonly params: readonly string[];
+  /** Kept so that anything reading this function can be differentiated. */
+  readonly body: Expr;
   readonly call: (args: readonly number[]) => number;
   /** Functions of one variable can be drawn; others are still callable. */
   readonly curve: PlottableCurve | null;
+  /** The derivatives prime notation asked for, lowest order first. */
+  readonly derivatives: readonly DerivedFunction[];
+  /** Why there are no more of them, for the entry that asked. */
+  readonly derivativeError: string | null;
 }
 
 /** An unnamed graph, such as `x^2` or `y = sin(x)`. */

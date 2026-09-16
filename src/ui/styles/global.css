@@ -650,6 +650,11 @@ code {
   color: var(--text-faint);
 }
 
+.reference-note {
+  font-style: normal;
+  opacity: 0.7;
+}
+
 /* ---------- Status bar ---------- */
 
 .status-bar {

@@ -5,6 +5,7 @@ import {
   arityMessage,
   BUILTIN_CONSTANTS,
   BUILTIN_FUNCTIONS,
+  resolveFunctionArgument,
   type FunctionRegistry,
 } from './functions';
 
@@ -125,6 +126,23 @@ function compileNode(
           `${arityMessage(definition)}, but got ${node.args.length}`,
         );
       }
+      if (definition.higherOrder !== undefined) {
+        // The function argument is a name, resolved once here rather than on
+        // every sample; what follows it compiles like any other argument.
+        const target = resolveFunctionArgument(node.args[0], functions, node.callee);
+        const rest = node.args
+          .slice(1)
+          .map((arg) => compileNode(arg, params, constants, functions));
+        const restFns = rest.map((arg) => arg.fn);
+        const { higherOrder } = definition;
+        const higher: CompiledFn = (args = EMPTY_ARGS) =>
+          higherOrder(target, restFns.map((argFn) => argFn(args)));
+        // Folding means integrating once at compile time instead of per sample.
+        return rest.every((arg) => arg.constant)
+          ? constantFold(higher(EMPTY_ARGS))
+          : { fn: higher, constant: false };
+      }
+
       const compiledArgs = node.args.map((arg) => compileNode(arg, params, constants, functions));
       const argFns = compiledArgs.map((arg) => arg.fn);
       const allConstant = compiledArgs.every((arg) => arg.constant);

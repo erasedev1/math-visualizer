@@ -27,6 +27,7 @@ const IDENT_START = /[A-Za-z_Α-ω]/;
 const IDENT_PART = /[A-Za-z0-9_Α-ω]/;
 const DIGIT = /[0-9]/;
 const WHITESPACE = /\s/;
+const PRIME = "'";
 
 const DELIMITERS: Readonly<Record<string, TokenType | undefined>> = {
   '[': 'lbracket',
@@ -99,6 +100,10 @@ export function tokenize(source: string): Token[] {
       const start = i;
       i += 1;
       while (isIdentPart(source[i])) i += 1;
+      // Trailing primes belong to the name: `f'` is how a derivative is
+      // written by hand, and what it means is decided later, by whatever
+      // resolves names. The tokenizer only has to keep the two together.
+      while (source[i] === PRIME) i += 1;
       tokens.push({ type: 'identifier', value: source.slice(start, i), start, end: i });
       continue;
     }

@@ -4,6 +4,7 @@ import {
   arityMessage,
   BUILTIN_CONSTANTS,
   BUILTIN_FUNCTIONS,
+  resolveFunctionArgument,
   type FunctionRegistry,
 } from '../expression/functions';
 import {
@@ -98,11 +99,27 @@ export function evaluateValue(node: Expr, scope: ValueScope = {}): Value {
         return applyBinary(expr.operator, evaluate(expr.left), evaluate(expr.right));
 
       case 'Call':
-        return applyCall(expr.callee, expr.args.map(evaluate));
+        return applyCall(expr.callee, expr.args);
     }
   };
 
-  const applyCall = (name: string, args: readonly Value[]): Value => {
+  const applyCall = (name: string, argExpressions: readonly Expr[]): Value => {
+    // A function taking a function reads its first argument as a name, so the
+    // arguments cannot all be evaluated before the call is looked up.
+    const higher = numericFunctions.get(name)?.higherOrder;
+    if (higher !== undefined) {
+      const definition = numericFunctions.get(name)!;
+      if (argExpressions.length < definition.minArgs || argExpressions.length > definition.maxArgs) {
+        throw new ExpressionError(`${arityMessage(definition)}, but got ${argExpressions.length}`);
+      }
+      const target = resolveFunctionArgument(argExpressions[0], numericFunctions, name);
+      const rest = argExpressions
+        .slice(1)
+        .map((argument) => asNumber(evaluate(argument), `an argument to ${name}`));
+      return number(higher(target, rest));
+    }
+
+    const args = argExpressions.map(evaluate);
     const geometric = valueFunctions.get(name);
     if (geometric !== undefined) {
       if (args.length < geometric.minArgs || args.length > geometric.maxArgs) {
