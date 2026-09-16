@@ -3,7 +3,7 @@ import { describeValue } from '@/core/values/types';
 import type { WorkspaceState } from '@/core/workspace/evaluate';
 import type { ItemResult } from '@/core/workspace/types';
 import { resultCurve, resultShape } from '@/core/workspace/types';
-import { drawableAsVectors } from '@/core/values/types';
+import { columnsArePlanePoints } from '@/core/values/types';
 import type { SliderConfig } from '@/core/workspace/slider';
 import { bounds, type Viewport } from '@/rendering/2d/viewport';
 import {
@@ -34,9 +34,10 @@ export function Inspector(props: InspectorProps): React.JSX.Element {
     result !== null &&
     (resultCurve(result) !== null ||
       resultShape(result) !== null ||
-      (entry?.showVectors === true &&
+      (entry?.matrixDrawing !== undefined &&
+        entry.matrixDrawing !== 'none' &&
         result.kind === 'value' &&
-        drawableAsVectors(result.value)));
+        columnsArePlanePoints(result.value)));
 
   return (
     <section className="panel inspector" id="inspector-panel" aria-label="Inspector">

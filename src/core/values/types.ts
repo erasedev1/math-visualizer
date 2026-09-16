@@ -177,10 +177,20 @@ export function describeValue(value: Value, format: (n: number) => string): stri
 }
 
 /**
- * Whether a value can be drawn as plane vectors: a matrix of two rows, whose
- * columns are points in the plane. For a linear map those columns are exactly
- * where the basis vectors land, which is what makes drawing them worthwhile.
+ * Whether a matrix's columns are points in the plane: two rows, the x values
+ * above the y values.
+ *
+ * One shape, two readings worth drawing. For a linear map the columns are
+ * where the basis vectors land, so arrows show what the map does; for a data
+ * set they are observations, so points show where the data lies. Which of the
+ * two is meant is the reader's to say, and the canvas offers both.
  */
-export function drawableAsVectors(value: Value): value is MatrixValue {
+export function columnsArePlanePoints(value: Value): value is MatrixValue {
   return value.kind === 'matrix' && value.rows.length === 2;
+}
+
+/** The columns of such a matrix, as plane points. */
+export function planeColumns(value: MatrixValue): Point[] {
+  const [top, bottom] = value.rows as [readonly number[], readonly number[]];
+  return top.map((x, index) => ({ x, y: bottom[index] ?? 0 }));
 }

@@ -97,3 +97,9 @@ describe('isTrailingBlank', () => {
     expect(isTrailingBlank(entries, 0)).toBe(false);
   });
 });
+
+describe('a new entry', () => {
+  it('draws no matrix until asked, so a matrix is a grid before it is a picture', () => {
+    expect(createEntry('M = [[1, 2], [3, 4]]').matrixDrawing).toBe('none');
+  });
+});

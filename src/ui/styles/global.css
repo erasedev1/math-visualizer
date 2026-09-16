@@ -474,7 +474,7 @@ code {
   cursor: pointer;
 }
 
-.matrix-vectors-toggle[data-active='true'] {
+.matrix-draw-toggle[data-active='true'] {
   color: var(--accent);
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);

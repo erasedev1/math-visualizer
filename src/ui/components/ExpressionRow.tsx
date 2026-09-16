@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react';
 import { formatDisplayNumber } from '@/core/expression/print';
 import type { ItemResult } from '@/core/workspace/types';
 import { resultCurve, resultShape } from '@/core/workspace/types';
-import { drawableAsVectors } from '@/core/values/types';
+import { columnsArePlanePoints } from '@/core/values/types';
 import type { SliderConfig } from '@/core/workspace/slider';
 import { describeValue } from '@/core/values/types';
-import type { ExpressionEntry } from '@/ui/state/entries';
+import type { ExpressionEntry, MatrixDrawing } from '@/ui/state/entries';
 import { MatrixEditor } from './MatrixEditor';
 import { SliderControl } from './SliderControl';
 
@@ -27,7 +27,7 @@ export interface ExpressionRowProps {
   readonly onSliderValue: (value: number) => void;
   readonly onTogglePlay: () => void;
   readonly onMatrixChange: (rows: readonly (readonly number[])[]) => void;
-  readonly onToggleVectors: () => void;
+  readonly onSetMatrixDrawing: (drawing: MatrixDrawing) => void;
 }
 
 export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
@@ -43,8 +43,10 @@ export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
   const drawable =
     resultCurve(result) !== null ||
     resultShape(result) !== null ||
-    (entry.showVectors && result.kind === 'value' && drawableAsVectors(result.value));
-  const status = statusText(result, entry.showVectors);
+    (entry.matrixDrawing !== 'none' &&
+      result.kind === 'value' &&
+      columnsArePlanePoints(result.value));
+  const status = statusText(result, entry.matrixDrawing);
 
   return (
     <li className={`expression-row${selected ? ' is-selected' : ''}`} data-state={result.kind}>
@@ -97,9 +99,10 @@ export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
           <MatrixEditor
             rows={result.value.rows}
             editable={result.literal?.kind === 'matrix'}
-            showVectors={entry.showVectors}
+            drawing={entry.matrixDrawing}
+            drawable={columnsArePlanePoints(result.value)}
             onChange={props.onMatrixChange}
-            onToggleVectors={props.onToggleVectors}
+            onSetDrawing={props.onSetMatrixDrawing}
           />
         )}
 
@@ -124,7 +127,7 @@ export function ExpressionRow(props: ExpressionRowProps): React.JSX.Element {
 }
 
 /** One line explaining what the entry currently is, or why it is not working. */
-function statusText(result: ItemResult, showVectors: boolean): string | null {
+function statusText(result: ItemResult, drawing: MatrixDrawing): string | null {
   switch (result.kind) {
     case 'error':
       return result.message;
@@ -133,8 +136,8 @@ function statusText(result: ItemResult, showVectors: boolean): string | null {
       // Sliders and matrix grids already show their own contents.
       if (result.literal?.kind === 'number') return null;
       if (result.value.kind === 'matrix') {
-        return showVectors && !drawableAsVectors(result.value)
-          ? `Only a matrix with two rows can be drawn as plane vectors; transpose it if its vectors are the rows`
+        return drawing !== 'none' && !columnsArePlanePoints(result.value)
+          ? 'Only a matrix with two rows can be drawn on the plane; transpose it if its points are the rows'
           : null;
       }
       return `= ${describeValue(result.value, formatDisplayNumber)}`;

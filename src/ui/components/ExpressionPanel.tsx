@@ -1,6 +1,10 @@
 import type { ItemResult } from '@/core/workspace/types';
 import type { SliderConfig } from '@/core/workspace/slider';
-import { isTrailingBlank, type ExpressionEntry } from '@/ui/state/entries';
+import {
+  isTrailingBlank,
+  type ExpressionEntry,
+  type MatrixDrawing,
+} from '@/ui/state/entries';
 import { ExpressionRow } from './ExpressionRow';
 
 export interface ExpressionPanelProps {
@@ -18,7 +22,7 @@ export interface ExpressionPanelProps {
   readonly onSliderValue: (id: string, value: number) => void;
   readonly onTogglePlay: (id: string) => void;
   readonly onMatrixChange: (id: string, rows: readonly (readonly number[])[]) => void;
-  readonly onToggleVectors: (id: string) => void;
+  readonly onSetMatrixDrawing: (id: string, drawing: MatrixDrawing) => void;
 }
 
 const EMPTY_RESULT: ItemResult = { kind: 'empty', id: '', dependencies: [] };
@@ -53,7 +57,7 @@ export function ExpressionPanel(props: ExpressionPanelProps): React.JSX.Element 
             onSliderValue={(value) => props.onSliderValue(entry.id, value)}
             onTogglePlay={() => props.onTogglePlay(entry.id)}
             onMatrixChange={(rows) => props.onMatrixChange(entry.id, rows)}
-            onToggleVectors={() => props.onToggleVectors(entry.id)}
+            onSetMatrixDrawing={(drawing) => props.onSetMatrixDrawing(entry.id, drawing)}
           />
         ))}
       </ul>

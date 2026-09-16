@@ -12,7 +12,13 @@ import {
   type SliderConfig,
 } from '@/core/workspace/slider';
 import { resultCurve, resultShape } from '@/core/workspace/types';
-import { drawableAsVectors, ORIGIN, type MatrixValue, type Value } from '@/core/values/types';
+import {
+  columnsArePlanePoints,
+  ORIGIN,
+  planeColumns,
+  type MatrixValue,
+  type Value,
+} from '@/core/values/types';
 import type { SceneObject } from '@/rendering/2d/objects';
 import { formatNumber } from '@/core/expression/print';
 import { graphTheme, seriesColor, type ThemeName } from '@/rendering/2d/theme';
@@ -35,6 +41,7 @@ import {
   withTrailingBlank,
   withValue,
   type ExpressionEntry,
+  type MatrixDrawing,
 } from './state/entries';
 
 /** An empty workspace: one blank row, waiting to be typed in. */
@@ -125,8 +132,10 @@ export function App(): React.JSX.Element {
         ...(result.name === null ? {} : { label: result.name }),
       };
 
-      if (entry.showVectors && drawableAsVectors(result.value)) {
-        return matrixColumns(entry.id, result.value, style, result.name);
+      if (entry.matrixDrawing !== 'none' && columnsArePlanePoints(result.value)) {
+        return entry.matrixDrawing === 'vectors'
+          ? matrixColumns(entry.id, result.value, style, result.name)
+          : matrixPoints(entry.id, result.value, style);
       }
 
       const shape = resultShape(result);
@@ -193,11 +202,14 @@ export function App(): React.JSX.Element {
     [selectedId, commitEntries],
   );
 
-  const handleToggleVectors = useCallback((id: string) => {
+  const handleSetMatrixDrawing = useCallback((id: string, drawing: MatrixDrawing) => {
     setEntries((previous) => {
       const entry = previous.find((candidate) => candidate.id === id);
       if (entry === undefined) return previous;
-      return updateEntry(previous, id, { showVectors: !entry.showVectors });
+      // Asking again for what is already drawn turns it off, so one button
+      // both selects a reading and puts it away.
+      const next = entry.matrixDrawing === drawing ? 'none' : drawing;
+      return updateEntry(previous, id, { matrixDrawing: next });
     });
   }, []);
 
@@ -339,7 +351,7 @@ export function App(): React.JSX.Element {
           onSliderValue={handleSliderValue}
           onTogglePlay={handleTogglePlay}
           onMatrixChange={handleMatrixChange}
-          onToggleVectors={handleToggleVectors}
+          onSetMatrixDrawing={handleSetMatrixDrawing}
         />
 
         <div className="canvas-area">
@@ -493,6 +505,28 @@ function matrixColumns(
       width: style.width,
       ...(name === null ? {} : { label: `${name}${subscript(index + 1)}` }),
     },
+  }));
+}
+
+/**
+ * The columns of a matrix as points, for data rather than for a linear map.
+ *
+ * Unlabelled, unlike the arrows: a basis has two columns worth naming, while
+ * a data set has as many as it has observations and a label on each would
+ * bury the shape they make.
+ */
+function matrixPoints(
+  id: string,
+  value: MatrixValue,
+  style: { color: string; width: number },
+): SceneObject[] {
+  return planeColumns(value).map((at, index) => ({
+    kind: 'point' as const,
+    id: `${id}:point-${index + 1}`,
+    at,
+    // The numbers live in the grid, which is where they are edited.
+    movable: false,
+    style: { color: style.color, width: style.width },
   }));
 }
 

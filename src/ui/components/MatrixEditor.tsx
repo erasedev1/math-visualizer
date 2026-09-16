@@ -1,13 +1,44 @@
 import { formatDisplayNumber } from '@/core/expression/print';
+import type { MatrixDrawing } from '@/ui/state/entries';
 
 export interface MatrixEditorProps {
   readonly rows: readonly (readonly number[])[];
   /** Editable only when the definition is a literal that can be written back. */
   readonly editable: boolean;
-  readonly showVectors: boolean;
+  readonly drawing: MatrixDrawing;
+  /** False when the matrix is not two rows, so its columns are not plane points. */
+  readonly drawable: boolean;
   readonly onChange: (rows: readonly (readonly number[])[]) => void;
-  readonly onToggleVectors: () => void;
+  readonly onSetDrawing: (drawing: MatrixDrawing) => void;
 }
+
+/**
+ * The readings a two-row matrix offers, and what each button says it will do.
+ * Listed as data so the pair stays a pair: adding a third reading is an entry
+ * here rather than another branch.
+ */
+const DRAWINGS: readonly {
+  mode: Exclude<MatrixDrawing, 'none'>;
+  label: string;
+  glyph: string;
+  on: string;
+  off: string;
+}[] = [
+  {
+    mode: 'vectors',
+    label: 'vectors',
+    glyph: '\u2197',
+    on: 'Stop drawing the columns as vectors',
+    off: 'Draw each column as a vector on the graph',
+  },
+  {
+    mode: 'points',
+    label: 'points',
+    glyph: '\u2022',
+    on: 'Stop drawing the columns as points',
+    off: 'Draw each column as a point on the graph, for data',
+  },
+];
 
 const MAX_ROWS = 12;
 const MAX_COLUMNS = 12;
@@ -21,7 +52,7 @@ const MAX_COLUMNS = 12;
  * to, so it is shown but not edited.
  */
 export function MatrixEditor(props: MatrixEditorProps): React.JSX.Element {
-  const { rows, editable, showVectors } = props;
+  const { rows, editable, drawing, drawable } = props;
   const columns = rows[0]?.length ?? 0;
 
   const setCell = (row: number, column: number, value: number) => {
@@ -74,20 +105,20 @@ export function MatrixEditor(props: MatrixEditorProps): React.JSX.Element {
           {rows.length}&times;{columns}
         </span>
 
-        <button
-          type="button"
-          className="matrix-vectors-toggle"
-          onClick={props.onToggleVectors}
-          aria-pressed={showVectors}
-          data-active={showVectors}
-          title={
-            showVectors
-              ? 'Stop drawing the columns as vectors'
-              : 'Draw each column as a vector on the graph'
-          }
-        >
-          {'\u2197'} vectors
-        </button>
+        {drawable &&
+          DRAWINGS.map(({ mode, label, glyph, on, off }) => (
+            <button
+              key={mode}
+              type="button"
+              className="matrix-draw-toggle"
+              onClick={() => props.onSetDrawing(mode)}
+              aria-pressed={drawing === mode}
+              data-active={drawing === mode}
+              title={drawing === mode ? on : off}
+            >
+              {glyph} {label}
+            </button>
+          ))}
 
         {editable && (
           <>

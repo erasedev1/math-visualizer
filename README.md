@@ -4,7 +4,7 @@ An open-source, local-first mathematical and engineering workspace: a
 programmable canvas where mathematics, visualization and engineering
 calculations live in one environment.
 
-This repository is at **milestone 5, in progress**. What is described below as
+This repository is at **the end of milestone 5**. What is described below as
 implemented is implemented and tested; everything else is on the roadmap and
 deliberately absent from the interface.
 
@@ -48,10 +48,13 @@ deliberately absent from the interface.
   everything downstream recomputes. `transpose`, `det`, `rank`, `inverse`,
   `solve`, `identity`, `column`, `row`, `eigenvalues` and `eigenvectors`, plus
   the products between matrices, vectors and numbers.
-- A matrix of two rows can be drawn as vectors, one arrow per column, from a
-  toggle beside its grid. For a linear map those columns are where the basis
+- A matrix of two rows can be drawn on the plane, from a toggle beside its
+  grid, under either of the two readings its columns support. As vectors it is
+  one arrow per column: for a linear map those columns are where the basis
   vectors land, so `eigenvectors(M)` drawn this way shows the directions the
-  map leaves alone. Computed matrices can be drawn as readily as typed ones.
+  map leaves alone. As points it is a scatter, which is what makes
+  `[[1, 2, 3], [2, 4, 5]]` a data set and puts it on the graph beside the
+  `fit` of it. Computed matrices can be drawn as readily as typed ones.
 - Symbolic differentiation, written the way it is written by hand: define
   `f(x) = sin(x) + x^2/8` and `f'(x)` is its derivative, `f''(x)` the second.
   The derivative is an expression, not a slope at a point, so it plots, can be
@@ -77,14 +80,16 @@ deliberately absent from the interface.
   `correlation` and `rsquared`.
 - Least squares, drawn rather than reported: `fit(xs, ys)` is a line, so it
   appears on the graph beside the data and follows every slider the data
-  depends on. `slope` and `intercept` read its coefficients back, and because
+  depends on. Paired data can equally be one matrix of two rows — `fit(D)`,
+  `correlation(D)` — which is the same matrix the canvas draws as a scatter,
+  so the data and the line through it come from one entry. `slope` and `intercept` read its coefficients back, and because
   the fit is an ordinary line, `intersect`, `perpendicular` and the rest of
   plane geometry apply to it unchanged. A vertical stack of points has no
   least-squares line that is a function of x, and says so.
 
 - Appearance: per-object colour, line width and visibility; light and dark
   themes.
-- 525 automated tests covering parsing, evaluation, printing, viewport
+- 532 automated tests covering parsing, evaluation, printing, viewport
   transforms, tick selection, sampling, clipping, picking, dependency
   ordering, reactive propagation, plane geometry, linear algebra, slider
   behaviour, differentiation, numerical methods and statistics, checked
@@ -106,9 +111,10 @@ drawn, though longer ones compute normally. `minimum` and its relatives scan
 the interval before refining, so a dip narrower than the scan can hide from
 them, and `root` wants a bracket that changes sign rather than hunting for one.
 Statistics are descriptive: there is no distribution, no random sampling and
-no hypothesis test, and the only fit is a straight line. Data is not yet drawn
-as a scatter or a histogram, so a fitted line appears on the graph while the
-points it was fitted to do not.
+no hypothesis test, and the only fit is a straight line. Data is drawn as a
+scatter but not yet as a histogram or a box plot, and a scatter comes from a
+matrix of two rows, so a sample of more than two rows is computed but not
+drawn.
 
 ## Running it
 
@@ -268,6 +274,13 @@ expressions.
   the graph without a renderer, a chart type or a plot mode. The line it
   returns is anchored at x = 0 and x = 1, so `slope` and `intercept` recover
   the coefficients exactly rather than to within the width of the data.
+- **One shape, two readings, and the reader chooses.** A matrix of two rows is
+  a list of plane points however it was built, so the same numbers are a basis
+  under one reading and a data set under another. Rather than guess from
+  context, the canvas offers both and neither is the default; the two are
+  exclusive because they are readings of one thing, not two things to show at
+  once. That is also why a scatter needed no new value kind, no chart type and
+  no plot mode.
 - **Two estimators, both named.** `stddev` divides by n - 1 and `stddevp` by
   n. Which one is wanted depends on whether the numbers are a sample or the
   whole population, which is a question about the data and not about the
@@ -286,7 +299,7 @@ expressions.
 | 2 ✅ | reactive dependency graph, variables, sliders |
 | 3 ✅ | points, lines, circles, geometric relationships |
 | 4 ✅ | vectors, matrices, a matrix editor |
-| 5 | calculus, numerical methods, statistics |
+| 5 ✅ | calculus, numerical methods, statistics |
 | 6 | notebook/document blocks |
 | 7 | units and dimensional analysis, engineering modules |
 | 8 | 3D surfaces and parametric curves |

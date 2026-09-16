@@ -10,6 +10,15 @@ import { formatSliderValue, type SliderConfig } from '@/core/workspace/slider';
  * rather than holding a value beside it.
  */
 
+/**
+ * How a matrix of two rows is drawn, if at all.
+ *
+ * Arrows read its columns as vectors and points read them as observations.
+ * The two are exclusive because they are two readings of the same numbers,
+ * not two things to show at once.
+ */
+export type MatrixDrawing = 'none' | 'vectors' | 'points';
+
 export interface ExpressionEntry {
   readonly id: string;
   readonly source: string;
@@ -19,8 +28,8 @@ export interface ExpressionEntry {
   readonly visible: boolean;
   /** Slider settings, once the user has adjusted them. */
   readonly slider: SliderConfig | null;
-  /** Draw a matrix's columns as arrows on the graph. */
-  readonly showVectors: boolean;
+  /** How a matrix's columns are drawn on the graph, if at all. */
+  readonly matrixDrawing: MatrixDrawing;
 }
 
 export const DEFAULT_LINE_WIDTH = 2;
@@ -38,7 +47,7 @@ export function createEntry(source = '', colorIndex = 0): ExpressionEntry {
     lineWidth: DEFAULT_LINE_WIDTH,
     visible: true,
     slider: null,
-    showVectors: false,
+    matrixDrawing: 'none',
   };
 }
 
