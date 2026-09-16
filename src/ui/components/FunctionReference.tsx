@@ -1,6 +1,10 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { BUILTIN_CONSTANTS, BUILTIN_FUNCTION_LIST } from '@/core/expression/functions';
-import { VALUE_FUNCTION_LIST } from '@/core/values/functions';
+import {
+  VALUE_FUNCTION_LIST,
+  VALUE_FUNCTIONS,
+  type ValueFunction,
+} from '@/core/values/functions';
 
 /**
  * Lists exactly what the engine can evaluate.
@@ -21,10 +25,28 @@ export function FunctionReference(): React.JSX.Element {
               definition.name.includes(needle) ||
               definition.description.toLowerCase().includes(needle),
           );
-    return { geometry: filter(VALUE_FUNCTION_LIST), numeric: filter(BUILTIN_FUNCTION_LIST) };
+
+    // Grouped from the registry rather than by a hand-written list, so a new
+    // heading costs nothing and an untagged function still has a home.
+    const grouped = new Map<string, ValueFunction[]>();
+    for (const definition of filter(VALUE_FUNCTION_LIST)) {
+      const group = definition.group ?? 'Geometry';
+      grouped.set(group, [...(grouped.get(group) ?? []), definition]);
+    }
+
+    // A name in both registries means the same thing on both paths, with the
+    // value entry describing the wider case: `min(data)` covers `min(a, b)`.
+    // Listing it twice would suggest two functions where there is one.
+    const numeric = filter(BUILTIN_FUNCTION_LIST).filter(
+      (definition) => !VALUE_FUNCTIONS.has(definition.name),
+    );
+
+    return { values: [...grouped], numeric };
   }, [query]);
 
-  const total = matches.geometry.length + matches.numeric.length;
+  const total =
+    matches.values.reduce((running, [, list]) => running + list.length, 0) +
+    matches.numeric.length;
 
   const constants = useMemo(
     () => Object.keys(BUILTIN_CONSTANTS).filter((name) => /^[a-z]+$/.test(name)),
@@ -55,19 +77,19 @@ export function FunctionReference(): React.JSX.Element {
         aria-label="Search functions"
         onChange={(event) => setQuery(event.target.value)}
       />
-      {matches.geometry.length > 0 && (
-        <>
-          <h4 className="reference-heading">Geometry</h4>
+      {matches.values.map(([group, definitions]) => (
+        <Fragment key={group}>
+          <h4 className="reference-heading">{group}</h4>
           <ul className="reference-list">
-            {matches.geometry.map((definition) => (
+            {definitions.map((definition) => (
               <li key={definition.name}>
                 <code>{definition.signature}</code>
                 <span>{definition.description}</span>
               </li>
             ))}
           </ul>
-        </>
-      )}
+        </Fragment>
+      ))}
 
       {matches.numeric.length > 0 && (
         <>

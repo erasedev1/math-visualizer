@@ -68,18 +68,33 @@ deliberately absent from the interface.
   it gives `f` back: the fundamental theorem is one of the derivative rules.
 - A tangent line needs nothing new: with a slider `a`, the line
   `y = f(a) + f'(a)(x - a)` touches the curve at `a` and follows the slider.
+- Statistics over a sample, which is just a row of numbers: `d = [2, 4, 4, 5]`
+  gives `mean`, `median`, `mode`, `min`, `max`, `range`, `count`, `sum`,
+  `quantile(d, 0.9)`, `iqr`, and both estimators of spread — `variance` and
+  `stddev` divide by n - 1, `variancep` and `stddevp` by n. A sample can be
+  written as a row, a vector, a matrix of any shape, or the numbers
+  themselves: `mean(1, 2, 3)`. Between two samples there is `covariance`,
+  `correlation` and `rsquared`.
+- Least squares, drawn rather than reported: `fit(xs, ys)` is a line, so it
+  appears on the graph beside the data and follows every slider the data
+  depends on. `slope` and `intercept` read its coefficients back, and because
+  the fit is an ordinary line, `intersect`, `perpendicular` and the rest of
+  plane geometry apply to it unchanged. A vertical stack of points has no
+  least-squares line that is a function of x, and says so.
+
 - Appearance: per-object colour, line width and visibility; light and dark
   themes.
-- 460 automated tests covering parsing, evaluation, printing, viewport
+- 525 automated tests covering parsing, evaluation, printing, viewport
   transforms, tick selection, sampling, clipping, picking, dependency
   ordering, reactive propagation, plane geometry, linear algebra, slider
-  behaviour, differentiation and numerical methods, checked against analytical
-  results — every derivative rule against a central difference, and every
-  integral against its closed form.
+  behaviour, differentiation, numerical methods and statistics, checked
+  against analytical results — every derivative rule against a central
+  difference, every integral against its closed form, and every statistic
+  against the worked example it comes from.
 
-**Not built yet** — statistics, tables, notebook blocks,
-units, engineering modules, 3D, the AI tool layer, project files and
-undo/redo. The UI does not contain controls for any of them.
+**Not built yet** — tables, notebook blocks, units, engineering modules, 3D,
+the AI tool layer, project files and undo/redo. The UI does not contain
+controls for any of them.
 
 **Known limits at this milestone** — a curve is compiled on the unboxed
 numeric path, so a function cannot yet read a point, a vector or a matrix
@@ -90,6 +105,10 @@ eigenvalues, is refused rather than approximated. Only plane vectors are
 drawn, though longer ones compute normally. `minimum` and its relatives scan
 the interval before refining, so a dip narrower than the scan can hide from
 them, and `root` wants a bracket that changes sign rather than hunting for one.
+Statistics are descriptive: there is no distribution, no random sampling and
+no hypothesis test, and the only fit is a straight line. Data is not yet drawn
+as a scatter or a histogram, so a fitted line appears on the graph while the
+points it was fitted to do not.
 
 ## Running it
 
@@ -130,7 +149,8 @@ src/
                   definition parser, function/constant registry
     values/       the value domain: numbers, points, vectors, matrices,
                   lines, circles, polygons, plane geometry, dense linear
-                  algebra, and the functions over them
+                  algebra, descriptive statistics and least squares, and the
+                  functions over them
     workspace/    dependency graph, reactive evaluation, slider behaviour
     plot/         compiles an expression into a drawable curve
     calculus/     symbolic differentiation, simplification, prime notation,
@@ -238,6 +258,21 @@ expressions.
   closure integrates a plain function of one number on every sample. So the
   value domain needs no function kind, the unboxed numeric path is preserved,
   and plotting an antiderivative works rather than being a later milestone.
+- **A data set is a row of numbers, not a new kind of value.** `[2, 4, 4, 5]`
+  is already a 1x4 matrix, so statistics read what the language could always
+  write, and `column(M, 2)` or `eigenvalues(M)` can be described without
+  converting anything. A statistic accepts a matrix of any shape, a vector, or
+  the numbers written out, because all three are the same sample.
+- **A fit is a line, so it is already drawable.** `fit(xs, ys)` returns the
+  same line value that `line(A, B)` does, which is what puts a regression on
+  the graph without a renderer, a chart type or a plot mode. The line it
+  returns is anchored at x = 0 and x = 1, so `slope` and `intercept` recover
+  the coefficients exactly rather than to within the width of the data.
+- **Two estimators, both named.** `stddev` divides by n - 1 and `stddevp` by
+  n. Which one is wanted depends on whether the numbers are a sample or the
+  whole population, which is a question about the data and not about the
+  software, so both are offered under names that say which is which rather
+  than one being chosen silently.
 - **Refusals over approximations.** A singular matrix has no inverse, a
   rotation has no real eigenvalues, and a system can have no single solution.
   Each says so on the entry that caused it rather than returning a

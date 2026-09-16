@@ -12,6 +12,7 @@ import {
   withinForm,
 } from './geometry';
 import * as linear from './matrix';
+import * as stats from './statistics';
 import {
   circle,
   describeKind,
@@ -40,8 +41,13 @@ import {
  * the on-screen reference all read the same list and it cannot drift.
  */
 
+/** The heading a function is listed under in the on-screen reference. */
+export type ValueFunctionGroup = 'Geometry' | 'Statistics';
+
 export interface ValueFunction {
   readonly name: string;
+  /** Defaults to Geometry, which is where everything started out. */
+  readonly group?: ValueFunctionGroup | undefined;
   readonly minArgs: number;
   readonly maxArgs: number;
   readonly apply: (args: readonly Value[]) => Value;
@@ -163,6 +169,93 @@ function magnitudeOf(value: VectorValue): number {
   return Math.hypot(...value.components);
 }
 
+/**
+ * A sample of observations: one matrix or vector, or the numbers written out.
+ *
+ * A matrix is read row by row, so a data set can be typed as `[4, 8, 15]` and
+ * a column of one can be used just as readily. Writing the numbers directly —
+ * `mean(1, 2, 3)` — reads better for a handful of them, and costs nothing
+ * because a lone number is already a sample of one.
+ */
+function expectSample(args: readonly Value[], name: string): number[] {
+  const first = args[0];
+  if (args.length === 1 && first !== undefined) {
+    if (first.kind === 'matrix') return first.rows.flatMap((row) => [...row]);
+    if (first.kind === 'vector') return [...first.components];
+  }
+  return args.map((_, index) => expectNumber(args, index, name));
+}
+
+/** A sample given as a single matrix or vector, for the functions that take two. */
+function expectSampleAt(args: readonly Value[], index: number, name: string): number[] {
+  const argument = args[index];
+  if (argument?.kind === 'matrix') return argument.rows.flatMap((row) => [...row]);
+  if (argument?.kind === 'vector') return [...argument.components];
+  throw new ExpressionError(
+    `${name} expects a list of numbers as argument ${index + 1}, but got ${
+      argument === undefined ? 'nothing' : withArticle(argument.kind)
+    }`,
+  );
+}
+
+/**
+ * Two samples of matching length, written either as two arguments or as one
+ * matrix of two rows.
+ *
+ * The second form is the same convention the canvas already uses: the columns
+ * of a two-row matrix are points in the plane, so `[[1, 2, 3], [2, 4, 5]]` is
+ * three points and `fit` of it is the line through them.
+ */
+function expectPairedSamples(args: readonly Value[], name: string): [number[], number[]] {
+  let xs: number[];
+  let ys: number[];
+
+  const only = args[0];
+  if (args.length === 1) {
+    if (only?.kind !== 'matrix' || only.rows.length !== 2) {
+      throw new ExpressionError(
+        `${name} of one argument needs a matrix of two rows, the x values and the y values`,
+      );
+    }
+    xs = [...only.rows[0]!];
+    ys = [...only.rows[1]!];
+  } else {
+    xs = expectSampleAt(args, 0, name);
+    ys = expectSampleAt(args, 1, name);
+  }
+
+  if (xs.length !== ys.length) {
+    throw new ExpressionError(
+      `${name} needs the same number of x and y values, but got ${xs.length} and ${ys.length}`,
+    );
+  }
+  if (xs.length < 2) {
+    throw new ExpressionError(`${name} needs at least two points, but got ${xs.length}`);
+  }
+  return [xs, ys];
+}
+
+/**
+ * A spread, refused by name when there are too few observations to measure
+ * one. A sample estimator divides by n - 1, so it needs two of them.
+ */
+function expectSpread(
+  args: readonly Value[],
+  name: string,
+  spread: stats.Spread,
+  compute: (data: readonly number[], spread: stats.Spread) => number | null,
+): Value {
+  const data = expectSample(args, name);
+  const result = compute(data, spread);
+  if (result === null) {
+    const needed = spread === 'sample' ? 'two observations' : 'one observation';
+    throw new ExpressionError(
+      `${name} needs at least ${needed} to measure a spread, but got ${data.length}`,
+    );
+  }
+  return number(result);
+}
+
 function define(
   name: string,
   signature: string,
@@ -170,8 +263,48 @@ function define(
   minArgs: number,
   maxArgs: number,
   apply: (args: readonly Value[]) => Value,
+  group: ValueFunctionGroup = 'Geometry',
 ): ValueFunction {
-  return { name, signature, description, minArgs, maxArgs, apply };
+  return { name, group, signature, description, minArgs, maxArgs, apply };
+}
+
+/**
+ * A statistic: one number read off a sample, taken variadically so that both
+ * `mean(data)` and `mean(1, 2, 3)` reach the same routine.
+ */
+function stat(
+  name: string,
+  signature: string,
+  description: string,
+  compute: (data: readonly number[]) => number,
+): ValueFunction {
+  return define(
+    name,
+    signature,
+    description,
+    1,
+    Infinity,
+    (args) => number(compute(expectSample(args, name))),
+    'Statistics',
+  );
+}
+
+/** A statistic that has no answer for a sample too small to measure. */
+function spread(
+  name: string,
+  description: string,
+  estimator: stats.Spread,
+  compute: (data: readonly number[], spread: stats.Spread) => number | null,
+): ValueFunction {
+  return define(
+    name,
+    `${name}(data)`,
+    description,
+    1,
+    Infinity,
+    (args) => expectSpread(args, name, estimator, compute),
+    'Statistics',
+  );
 }
 
 const DEFINITIONS: readonly ValueFunction[] = [
@@ -481,6 +614,180 @@ const DEFINITIONS: readonly ValueFunction[] = [
         shape === undefined ? 'nothing' : withArticle(shape.kind)
       }`,
     );
+  }),
+
+  // Statistics. Each takes a sample: one matrix or vector, or loose numbers.
+  stat('count', 'count(data)', 'How many observations there are', (data) => data.length),
+  stat('sum', 'sum(data)', 'The total of the observations', stats.sum),
+  stat('mean', 'mean(data)', 'The arithmetic mean', stats.mean),
+  stat('median', 'median(data)', 'The middle observation', stats.median),
+  stat('min', 'min(data) or min(a, b, ...)', 'The smallest observation', stats.smallest),
+  stat('max', 'max(data) or max(a, b, ...)', 'The largest observation', stats.largest),
+  stat('range', 'range(data)', 'Largest observation minus smallest', (data) =>
+    stats.largest(data) - stats.smallest(data),
+  ),
+  stat(
+    'iqr',
+    'iqr(data)',
+    'Interquartile range: the width of the middle half',
+    stats.interquartileRange,
+  ),
+
+  define(
+    'mode',
+    'mode(data)',
+    'The most common observation',
+    1,
+    Infinity,
+    (args) => {
+      const data = expectSample(args, 'mode');
+      if (stats.highestFrequency(data) === 1) {
+        throw new ExpressionError('Every observation occurs once, so there is no mode');
+      }
+      const common = stats.modes(data);
+      if (common.length > 1) {
+        throw new ExpressionError(
+          `These observations are equally common, so there is no single mode: ${common.join(', ')}`,
+        );
+      }
+      return number(common[0]!);
+    },
+    'Statistics',
+  ),
+
+  spread('variance', 'Sample variance, dividing by n - 1', 'sample', stats.variance),
+  spread(
+    'stddev',
+    'Sample standard deviation, dividing by n - 1',
+    'sample',
+    stats.standardDeviation,
+  ),
+  spread('variancep', 'Population variance, dividing by n', 'population', stats.variance),
+  spread(
+    'stddevp',
+    'Population standard deviation, dividing by n',
+    'population',
+    stats.standardDeviation,
+  ),
+
+  define(
+    'quantile',
+    'quantile(data, p)',
+    'The observation p of the way through the data, p from 0 to 1',
+    2,
+    2,
+    (args) => {
+      const data = expectSampleAt(args, 0, 'quantile');
+      const p = expectNumber(args, 1, 'quantile');
+      if (!(p >= 0 && p <= 1)) {
+        throw new ExpressionError(`quantile needs a fraction between 0 and 1, but got ${p}`);
+      }
+      return number(stats.quantile(data, p));
+    },
+    'Statistics',
+  ),
+
+  define(
+    'covariance',
+    'covariance(xs, ys)',
+    'Sample covariance of two samples of equal length',
+    1,
+    2,
+    (args) => {
+      const [xs, ys] = expectPairedSamples(args, 'covariance');
+      const result = stats.covariance(xs, ys, 'sample');
+      if (result === null) {
+        throw new ExpressionError('covariance needs at least two points to measure a spread');
+      }
+      return number(result);
+    },
+    'Statistics',
+  ),
+
+  define(
+    'correlation',
+    'correlation(xs, ys)',
+    "Pearson's correlation coefficient, between -1 and 1",
+    1,
+    2,
+    (args) => {
+      const [xs, ys] = expectPairedSamples(args, 'correlation');
+      const r = stats.correlation(xs, ys);
+      if (r === null) {
+        throw new ExpressionError(
+          'One of these samples never varies, so there is no correlation to measure',
+        );
+      }
+      return number(r);
+    },
+    'Statistics',
+  ),
+
+  define(
+    'fit',
+    'fit(xs, ys)',
+    'The least-squares line through the points, drawn on the graph',
+    1,
+    2,
+    (args) => {
+      const [xs, ys] = expectPairedSamples(args, 'fit');
+      const fitted = stats.leastSquares(xs, ys);
+      if (fitted === null) {
+        throw new ExpressionError(
+          'Every x is the same here, so the best line is vertical and is not a function of x',
+        );
+      }
+      // Two points one apart in x, so slope() and intercept() read the
+      // coefficients back exactly. The line is infinite, so where it is
+      // anchored never shows.
+      return line(
+        { x: 0, y: fitted.intercept },
+        { x: 1, y: fitted.intercept + fitted.slope },
+        'line',
+      );
+    },
+    'Statistics',
+  ),
+
+  define(
+    'rsquared',
+    'rsquared(xs, ys)',
+    'The fraction of the variation in y the least-squares line accounts for',
+    1,
+    2,
+    (args) => {
+      const [xs, ys] = expectPairedSamples(args, 'rsquared');
+      const fitted = stats.leastSquares(xs, ys);
+      if (fitted === null) {
+        throw new ExpressionError('Every x is the same here, so there is no line to score');
+      }
+      const score = stats.coefficientOfDetermination(xs, ys, fitted);
+      if (score === null) {
+        throw new ExpressionError('Every y is the same here, so there is no variation to account for');
+      }
+      return number(score);
+    },
+    'Statistics',
+  ),
+
+  // Reading a line back, which is what makes fit() more than a picture.
+  define('slope', 'slope(l)', 'Slope of a line, ray or segment', 1, 1, (args) => {
+    const target = expectLine(args, 0, 'slope');
+    const run = target.to.x - target.from.x;
+    if (run === 0) {
+      throw new ExpressionError('This line is vertical, so it has no slope');
+    }
+    return number((target.to.y - target.from.y) / run);
+  }),
+
+  define('intercept', 'intercept(l)', 'Where a line crosses the y axis', 1, 1, (args) => {
+    const target = expectLine(args, 0, 'intercept');
+    const run = target.to.x - target.from.x;
+    if (run === 0) {
+      throw new ExpressionError('This line is vertical, so it crosses the y axis nowhere or everywhere');
+    }
+    const gradient = (target.to.y - target.from.y) / run;
+    return number(target.from.y - gradient * target.from.x);
   }),
 ];
 
